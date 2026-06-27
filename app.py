@@ -342,4 +342,60 @@ else:
     else:
         st.info("Nema unesenih čestica za prikaz.")
 
+
+
+        # --- SPAJANJE USER I ADMIN DJELA U JEDAN LINK ---
+st.sidebar.write("---")
+izbor_stranice = st.sidebar.radio("🧭 Izbornik:", ["🗺️ Pregled čestica", "🔐 Administracija"])
+
+if izbor_stranice == "🔐 Administracija":
+    # Ako kliknete na admina, provjeravamo admin lozinku iz secrets.toml
+    if "admin_autentificiran" not in st.session_state:
+        st.session_state["admin_autentificiran"] = False
+
+    if not st.session_state["admin_autentificiran"]:
+        st.subheader("🔐 Kontrolna ploča - Administracija")
+        u_admin_korisnik = st.text_input("Admin Korisničko ime:", key="web_admin_user")
+        u_admin_lozinka = st.text_input("Admin Lozinka:", type="password", key="web_admin_pass")
+        
+        if st.button("Prijavi se u sustav", key="web_admin_btn"):
+            if u_admin_korisnik == st.secrets["admin_credentials"]["username"] and u_admin_lozinka == st.secrets["admin_credentials"]["password"]:
+                st.session_state["admin_autentificiran"] = True
+                st.rerun()
+            else:
+                st.error("❌ Nevžeće administratorske lozinke.")
+        st.stop()
+
+    # Ako je lozinka točna, učitavamo vaše module izravno na ekran
+    from admin_unos import prikazi_unos
+    from admin_uredi import prikazi_uredivanje
+    from admin_brisi import prikazi_brisanje
+    
+    # Ponovno dohvaćamo čestice za admin izbornike
+    cursor.execute("SELECT id, broj_cestice FROM cestice")
+    c_glavni_dict = {broj: id for id, broj in cursor.fetchall()}
+    
+        # Ako je lozinka točna, učitavamo vaše module izravno na ekran
+    from admin_unos import prikazi_unos
+    from admin_uredi import prikazi_uredivanje
+    from admin_brisi import prikazi_brisanje
+    
+    # Ponovno dohvaćamo čestice za admin izbornike
+    cursor.execute("SELECT id, broj_cestice FROM cestice")
+    c_glavni_dict = {broj: id for id, broj in cursor.fetchall()}
+    
+    # POPRAVLJENO: Stvaramo p_obrnuti_dict koji nedostaje u app.py
+    p_obrnuti_dict = {id: naziv for id, naziv in sva_p}
+    
+    tab_glavni1, tab_glavni2, tab_glavni3 = st.tabs(["➕ Unos Podataka", "✍️ Uredi Česticu", "❌ Brisanje Podataka"])
+    with tab_glavni1: prikazi_unos(conn, cursor, sva_p, p_dict)
+    with tab_glavni2: prikazi_uredivanje(conn, cursor, c_glavni_dict, p_dict, p_obrnuti_dict)
+    with tab_glavni3: prikazi_brisanje(conn, cursor, c_glavni_dict)
+
+    tab_glavni1, tab_glavni2, tab_glavni3 = st.tabs(["➕ Unos Podataka", "✍️ Uredi Česticu", "❌ Brisanje Podataka"])
+    with tab_glavni1: prikazi_unos(conn, cursor, sva_p, p_dict)
+    with tab_glavni2: prikazi_uredivanje(conn, cursor, c_glavni_dict, p_dict, p_obrnuti_dict)
+    with tab_glavni3: prikazi_brisanje(conn, cursor, c_glavni_dict)
+
+
 conn.close()
