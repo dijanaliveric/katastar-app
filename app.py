@@ -45,14 +45,14 @@ st.markdown("<style>img {-webkit-touch-callout:none;-webkit-user-select:none;use
 st.sidebar.title("🧭 Arhiva Navigacija")
 izbor = st.sidebar.radio(
     "Odaberite što želite gledati:",
-    ["🗺️ Pregled i pretraga čestica", "📋 Opći posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti od rodbine"]
+    ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
 )
 
 # --- OPCIJA 1: PREGLED ČESTICA ---
 if izbor == "🗺️ Pregled i pretraga čestica":
     st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
     
-    # Uploader za rodbinu na vrhu
+
     if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
     up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
     if up_doc is not None:
@@ -120,7 +120,7 @@ elif izbor == "📋 Posjedovni listovi":
             b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
             st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
     else: 
-        st.info("U bazi podataka trenutno nema unesenih općih posjedovnih listova.")
+        st.info("U bazi podataka trenutno nema unesenih posjedovnih listova.")
 
 # --- OPCIJA 3: VELIKI PREGLED MATIČNIH KNJIGA PREKO CIJELOG EKRANA ---
 elif izbor == "📜 Matične knjige":
@@ -145,7 +145,7 @@ elif izbor == "📜 Matične knjige":
     else: 
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
-# --- OPCIJA 4: PREGLED DOKUMENATA OD RODBINE PREKO CIJELOG EKRANA ---
+
 elif izbor == "📂 Dokumenti":
     st.title("📂 Pregled Obiteljskih Dokumenata")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
@@ -194,6 +194,6 @@ elif izbor == "📂 Dokumenti":
                 st.warning(f"Format datoteke '{naziv_datoteke}' nije podržan za izravan pregled.")
 
     else: 
-        st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
+        st.info("Nijedan dokument nije učitan preko uploadera.")
 
 conn.close()
