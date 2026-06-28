@@ -55,7 +55,7 @@ cursor = conn.cursor()
 # =========================================================================
 # 🏛️ NAŠ VLASTITI UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
-popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti od rodbine"]
+popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
 
 # Dijelimo cijeli ekran na dva dijela: Lijevi (Izbornik) i Desni (Sadržaj)
 glavni_col1, glavni_col2 = st.columns([1, 4])
@@ -171,7 +171,6 @@ with glavni_col2:
         svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pos:
-            # POPRAVLJENO: Uzimamo indeks [0] za čisto ime datoteke na popisu rodbine
             p_imena = [f.split("|||", 1)[0] for f in svi_pos]
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
             if odabir_doc != "":
