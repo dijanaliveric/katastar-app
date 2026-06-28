@@ -243,13 +243,15 @@ st.write("---")
 
 if odabrana_c != "-- Prikaži sve čestice --":
     id_c = c_dict[odabrana_c]
+        # Provjerite da upit povlači točno ovih 9 stupaca (uključujući c.sifra na kraju)
     cursor.execute("""
         SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra
         FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s
     """, (id_c,))
 
+    # S desne strane znaka jednakosti mora biti točno 9 varijabli
     zk, dnevnik, oznaka, naziv, napomena, povrsina, lokacija, ko, interna_sifra = cursor.fetchone()
-    
+
     st.markdown(f"### 📍 Podaci za česticu: **{odabrana_c}** ({lokacija})")
     st.link_button("🌐 Otvori ovu česticu na Uređena Zemlja (ZIS)", "https://oss.uredjenazemlja.hr")
     st.write("")
