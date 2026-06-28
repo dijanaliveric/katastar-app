@@ -3,6 +3,7 @@ import psycopg2
 import streamlit as st
 from PIL import Image
 import urllib.parse
+import base64 
 import warnings
 
 # OVO GASI DOSADNA PANDAS UPOZORENJA U TERMINALU
