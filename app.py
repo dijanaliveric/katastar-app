@@ -193,7 +193,6 @@ except Exception:
         conn.rollback()
     pass
 
-
 st.subheader("🔍 Pretraživanje")
 col_f1, col_f2 = st.columns(2)
 
@@ -209,8 +208,6 @@ if odabrano_p == "Sva područja":
 else:
     cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s", (p_dict[odabrano_p],))
 
-
-
 sve_c = cursor.fetchall()
 c_dict = {broj: id for id, broj in sve_c}
 
@@ -222,24 +219,24 @@ st.write("---")
 if odabrana_c != "-- Prikaži sve čestice --":
     id_c = c_dict[odabrana_c]
     cursor.execute("""
-        SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina
+        SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra
         FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s
     """, (id_c,))
 
-    
-    zk, dnevnik, oznaka, naziv, napomena, povrsina, lokacija, ko = cursor.fetchone()
+    zk, dnevnik, oznaka, naziv, napomena, povrsina, lokacija, ko, interna_sifra = cursor.fetchone()
     
     st.markdown(f"### 📍 Podaci za česticu: **{odabrana_c}** ({lokacija})")
-    
-
     st.link_button("🌐 Otvori ovu česticu na Uređena Zemlja (ZIS)", "https://oss.uredjenazemlja.hr")
     st.write("")
 
     c1, c2, c3 = st.columns(3)
-    c1.info(f"**📑 ZK Uložak:** {zk if zk else 'Nema podatak'}\n\n**🔢 Zadnji dnevnik:** {dnevnik if dnevnik else 'Nema podatak'}")
+    c1.info(f"**📑 Katastarska općina (K.O.):** {ko if ko else 'Nema podatak'}\n\n**🔢 ZK Uložak:** {zk if zk else 'Nema podatak'}")
     c2.info(f"**🌿 Oznaka:** {oznaka if oznaka else 'Nema podatak'}\n\n**🗺️ Naziv:** {naziv if naziv else 'Nema podatak'}")
     c3.success(f"**📐 Površina:**\n\n### {povrsina} m²" if povrsina else "**📐 Površina:**\n\nNije upisana")
     
+    # PRIKAZ INTERNE ŠIFRE/KATEGORIJE NA FRONTENDU
+    st.markdown(f"**🏷️ Interna kategorija čestice:** `{interna_sifra if interna_sifra else 'Bez šifre'}`")
+
     st.markdown("#### 📝 Napomena o stanju čestice:")
     if napomena:
         st.markdown(f"> {napomena}")
@@ -253,37 +250,36 @@ if odabrana_c != "-- Prikaži sve čestice --":
         FROM povijest_dokumenata WHERE id_cestice = %s
     """, (id_c,))
 
-    
     stari_listovi = cursor.fetchall()
     
     if stari_listovi:
         for vrsta, broj_l, starost, vlasnik, p_nap, datoteka in stari_listovi:
             ikona = "📕" if "vlasnič" in vrsta.lower() else "📘"
-            with st.expander(f"{ikona} {vrsta} — {starost} (Broj: {broj_l})"):
-                st.markdown(f"**👤 Upisana osoba:** {vlasnik}")
-                st.markdown(f"**🔍 Povijesna bilješka:** {p_nap}")
-                # --- NOVI DIO ZA IZRAVNI PRIKAZ JPG ILI PDF DATOTEKA NA EKRANU ---
-            if datoteka:
-                putanja = f"dokumenti/{datoteka}"
-                            # --- PRIVREMENI KOD ZA OTKRIVANJE GREŠKE ---
-            if datoteka:
-                putanja = f"dokumenti/{datoteka}"       
-                               
-                if datoteka.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(putanja, caption=f"Skenirani dokument: {datoteka}", use_container_width="always")
+            with st.expander(f"{ikona} {vrsta} — {starost if starost else 'Nepoznata godina'} (Broj: {broj_l})"):
+                st.markdown(f"**👤 Upisana osoba:** {vlasnik if vlasnik else '/'}")
+                st.markdown(f"**🔍 Povijesna bilješka:** {p_nap if p_nap else '/'}")
                 
-                elif datoteka.lower().endswith('.pdf'):
-                    import base64
-                    with open(putanja, "rb") as f:
-                        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-                    
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
-
-            
+                # --- NOVI, NEPROBOJAN PRIKAZ DOKUMENATA IZ SQL TEKSTA (Base64) UNUTAR EXPANDERA ---
+                if datoteka:
+                    try:
+                        if "|||" in datoteka:
+                            naziv_datoteke, b64_sadrzaj = datoteka.split("|||", 1)
+                            izvorni_bajtovi = base64.b64decode(b64_sadrzaj)
+                            
+                            if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                                st.image(izvorni_bajtovi, caption=f"Dokument: {naziv_datoteke}", use_container_width="always")
+                            
+                            elif naziv_datoteke.lower().endswith('.pdf'):
+                                # PDF prozor bez ikakvih gumba za preuzimanje na uređaj
+                                pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}" width="100%" height="600" type="application/pdf"></iframe>'
+                                st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                        else:
+                            # Prikaz poruke ako je u pitanju stari zapis iz prve faze testiranja aplikacije
+                            st.caption(f"📄 Vezana stara lokalna datoteka: {datoteka}")
+                    except Exception as e:
+                        st.error(f"❌ Greška prilikom učitavanja dokumenta: {e}")
     else:
         st.warning("U arhivi trenutno nema starih listova vezanih uz ovu česticu.")
-
 
 # --- POTPUNO POPRAVLJENO I SIGURNO ZA SUPABASE I PANDAS ---
 else:
@@ -291,8 +287,6 @@ else:
     if sve_c:
         import pandas as pd
         
-        # Uklonili smo sve komplicirane alias-e i navodnike iz samog SQL-a
-        # Pandas će sam preuzeti čiste nazive stupaca iz baze
         if odabrano_p == "Sva područja":
             upit = """
                 SELECT c.broj_cestice, c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.katastarska_opcina, p.naziv_podrucja, c.oznaka_zemljista, c.povrsina
@@ -301,7 +295,6 @@ else:
             """
             df = pd.read_sql_query(upit, conn)
         else:
-            # Koristimo siguran %s parametar za PostgreSQL
             upit = """
                 SELECT c.broj_cestice, c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.katastarska_opcina, p.naziv_podrucja, c.oznaka_zemljista, c.povrsina
                 FROM cestice c 
@@ -310,8 +303,6 @@ else:
             """
             df = pd.read_sql_query(upit, conn, params=(p_dict[odabrano_p],))
         
-        # Ručno i sigurno preimenujemo stupce u Pandasu nakon što su podaci već učitani
-        # Na ovaj način zaobilazimo sve SQL sintaksne greške i kvačice!
         preimenovani_stupci = {
             "broj_cestice": "Broj čestice",
             "zk_ulozak": "Broj ZK uloška",
@@ -323,15 +314,12 @@ else:
         }
         df = df.rename(columns=preimenovani_stupci)
         
-        # 1. Prikaz tablice rastegnute preko ekrana pomoću provjerene i stabilne sintakse
         st.dataframe(df, width='stretch', hide_index=True)
         
-        # 2. Izračun ukupne površine (sada tražimo točan naziv stupca koji smo gore preimenovali)
         ukupna_povrsina = pd.to_numeric(df['Površina (m²)'], errors='coerce').fillna(0).sum()
         
-        # 3. Prikaz metričke kartice u desnom poravnanju
         st.write("")
-        col_prazan1, col_prazan2, col_Desno = st.columns([2, 2, 1]) # Koristimo čiste brojeve za omjere stupaca
+        col_prazan1, col_prazan2, col_Desno = st.columns([2, 2, 1])
         
         with col_Desno:
             st.metric(

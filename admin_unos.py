@@ -64,14 +64,20 @@ def prikazi_unos(conn, cursor, sva_p, p_dict):
             st.info("Prvo dodajte područje s lijeve strane.")
 
     # --- TAB 2: UNOS STARIH LISTOVA ---
+        # --- TAB 2: UNOS STARIH LISTOVA (Supabase Storage Uploader) ---
+        # --- TAB 2: UNOS STARIH LISTOVA (Pretvaranje datoteke u SQL tekst - Base64) ---
     with tab2:
+        st.subheader("Povezivanje povijesnih listova s česticama")
+        
         cursor.execute("SELECT id, broj_cestice FROM cestice")
         sve_c_za_doc = cursor.fetchall()
+        
         if sve_c_za_doc:
-            c_doc_dict = {broj: id for id, broj in sve_c_za_doc}
+            c_doc_dict = {broj: int(id) for id, broj in sve_c_za_doc}
+            
             with st.form("f_d", clear_on_submit=True):
                 c_odabir = st.selectbox(
-                    "Poveži s česticom:", list(c_doc_dict.keys())
+                    "Poveži s česticom:", list(c_doc_dict.keys()), key="doc_c_odabir"
                 )
                 v_lista = st.selectbox(
                     "Vrsta dokumenta:", ["Posjedovni list", "Vlasnički list"]
@@ -80,34 +86,51 @@ def prikazi_unos(conn, cursor, sva_p, p_dict):
                 starost = st.text_input("Starost / Godina:")
                 vlasnik = st.text_input("Upisani vlasnik / posjednik:")
                 p_nap = st.text_area("Povijesna napomena:")
-                datoteka_naziv = st.text_input(
-                    "Točan naziv datoteke u mapi:"
+                
+                # Uploader ostaje isti - jednostavan izbor datoteke
+                ucitana_datoteka = st.file_uploader(
+                    "Odaberi sliku ili PDF dokument s računala/mobitela:", 
+                    type=["jpg", "jpeg", "png", "pdf"]
                 )
 
                 if st.form_submit_button("Spremi Dokument"):
-                    try:
-                        # POPRAVLJENO: ? zamijenjen s %s za Supabase (PostgreSQL)
-                        cursor.execute(
-                            """
-                            INSERT INTO povijest_dokumenata (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
-                            VALUES (%s, %s, %s, %s, %s, %s, %s)
-                            """,
-                            (
-                                c_doc_dict[c_odabir],
-                                v_lista,
-                                br_lista,
-                                starost,
-                                vlasnik,
-                                p_nap,
-                                datoteka_naziv if datoteka_naziv else None,
-                            ),
-                        )
-                        conn.commit()
-                        st.success("Dokument uspješno spremljen!")
-                        st.rerun()
-                    except Exception as e:
-                        if conn:
-                            conn.rollback()
-                        st.error(f"❌ Greška prilikom spremanja dokumenta: {e}")
-        else:
-            st.info("Prvo morate dodati barem jednu česticu.")
+                    if not ucitana_datoteka:
+                        st.error("❌ Morate odabrati datoteku prije spremanja!")
+                    else:
+                        try:
+                            import base64
+                            # 1. Čitamo datoteku i pretvaramo je u običan tekstualni niz
+                            bajtovi = ucitana_datoteka.read()
+                            tekstualni_b64 = base64.b64encode(bajtovi).decode('utf-8')
+                            
+                            # 2. Spajamo naziv datoteke s njenim sadržajem u jedan tekst
+                            # npr: "slika.jpg|||OVDJE_IDE_CILI_TEKST_SLIKE"
+                            kodirani_zapis = f"{ucitana_datoteka.name}|||{tekstualni_b64}"
+                            
+                            pravi_id_cestice = int(c_doc_dict[c_odabir])
+                            
+                            # 3. Upisujemo SVE u SQL tablicu odjednom (Preko provjerenog psycopg2)
+                            cursor.execute(
+                                """
+                                INSERT INTO povijest_dokumenata 
+                                (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
+                                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                """,
+                                (
+                                    pravi_id_cestice,
+                                    v_lista,
+                                    br_lista,
+                                    starost,
+                                    vlasnik,
+                                    p_nap,
+                                    kodirani_zapis,  # <-- Ovdje sada spremamo cijelu datoteku kao tekst!
+                                ),
+                            )
+                            conn.commit()
+                            st.success(f"✅ Uspješno spremljen dokument u bazu za česticu {c_odabir}!")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            if conn:
+                                conn.rollback()
+                            st.error(f"❌ Greška prilikom spremanja u SQL bazu: {e}")
