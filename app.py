@@ -8,6 +8,25 @@ import warnings
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# --- 🔒 TOTALNO BRISANJE GORNJE TRAKE I ZAŠTITA SLIKA ---
+st.markdown("""
+    <style>
+    /* Trajno i neprobojno gasi cijelu gornju traku i Fork gumb na svim uređajima */
+    [data-testid="stHeader"], header, [data-testid="stSidebar"] { display: none !important; height: 0px !important; }
+    .block-container { padding-top: 1.5rem !important; }
+    img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    div[data-testid='stImage'] img { pointer-events: none !important; }
+    
+    /* Responzivne prilagodbe za mobilne ekrane */
+    @media (max-width: 767px) {
+        h1 { font-size: 1.3rem !important; line-height: 1.2 !important; }
+        h2, h3, .stSubheader { font-size: 1.05rem !important; }
+        .block-container { padding-top: 1rem !important; }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
 # --- JEDNOSTAVNA ZAŠTITA ZA ULAZ ---
 if "autentificiran" not in st.session_state:
     st.session_state["autentificiran"] = False
@@ -32,23 +51,6 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-# --- 🔒 TOTALNO BRISANJE GORNJE TRAKE I ZAŠTITA SLIKA ---
-st.markdown("""
-    <style>
-    /* Trajno i neprobojno gasi cijelu gornju traku i Fork gumb na svim uređajima */
-    [data-testid="stHeader"], header, [data-testid="stSidebar"] { display: none !important; height: 0px !important; }
-    .block-container { padding-top: 1.5rem !important; }
-    img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-    div[data-testid='stImage'] img { pointer-events: none !important; }
-    
-    /* Responzivne prilagodbe za mobilne ekrane */
-    @media (max-width: 767px) {
-        h1 { font-size: 1.3rem !important; line-height: 1.2 !important; }
-        h2, h3, .stSubheader { font-size: 1.05rem !important; }
-        .block-container { padding-top: 1rem !important; }
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # =========================================================================
 # 🏛️ NAŠ VLASTITI UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
@@ -125,7 +127,9 @@ with glavni_col2:
     elif izbor == "📋 Opći posjedovni listovi":
         st.title("📋 Opći Katastarski Posjedovni Listovi")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-        svi_pl = [r for r in cursor.fetchall() if r and "|||" in r]
+        #svi_pl = [r for r in cursor.fetchall() if r and "|||" in r]
+        svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+
         if svi_pl:
             pl_imena = [f.split("|||", 1) for f in svi_pl]
             odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista:", [""] + pl_imena)
@@ -139,7 +143,9 @@ with glavni_col2:
     elif izbor == "📜 Matične knjige":
         st.title("📜 Arhiv Matičnih Knjiga")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-        sve_mk = [r for r in cursor.fetchall() if r and "|||" in r]
+        #sve_mk = [r for r in cursor.fetchall() if r and "|||" in r]
+        sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+
         if sve_mk:
             mk_imena = []
             for f in sve_mk:
@@ -157,7 +163,9 @@ with glavni_col2:
     elif izbor == "📂 Dokumenti od rodbine":
         st.title("📂 Pregled Dokumenata Poslanih s Terena")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-        svi_pos = [r for r in cursor.fetchall() if r and "|||" in r]
+        #svi_pos = [r for r in cursor.fetchall() if r and "|||" in r]
+        svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+
         if svi_pos:
             p_imena = [f.split("|||", 1) for f in svi_pos]
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
