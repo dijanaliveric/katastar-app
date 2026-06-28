@@ -106,73 +106,25 @@ st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
 st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
 
-# --- FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE ---
-col_ikona1, col_ikona2, col_ikona3, _ = st.columns([1, 1, 1, 4])  # Stvara dva stupca s lijeve strane
 
-with col_ikona1:
-    with st.popover("📋 Posjedovni Listovi"):
-        st.markdown("### 📄 Opći katastarski dokumenti")
-        st.write("Preuzmite posjedovne listove:")
-        try:
-            with open("dokumenti/posjedovni_list_1.pdf", "rb") as f1:
-                st.download_button("📥 Posjedovni list - 1. dio (PDF)", data=f1.read(), file_name="posjedovni_list_1.pdf", mime="application/pdf", key="glavni_pl_1")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'posjedovni_list_1.pdf' nije pronađena.")
-            
-        try:
-            with open("dokumenti/posjedovni_list_2.pdf", "rb") as f2:
-                st.download_button("📥 Posjedovni list - 2. dio (PDF)", data=f2.read(), file_name="posjedovni_list_2.pdf", mime="application/pdf", key="glavni_pl_2")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'posjedovni_list_2.pdf' nije pronađena.")
+# --- 4. FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE IZ BAZE (UNIVERZALNI MIME) ---
+col_ikona1, col_ikona2, col_ikona3, _ = st.columns()
 
-with col_ikona2:
-    # ---  MATIČNE KNJIGE ---
-    with st.popover("📜 Matične Knjige"):
-        st.markdown("### 🏛️ Matične knjige - državni arhiv Zadar")
-        st.write("Preuzmite obiteljsku arhivu:")
-        
-        try:
-            with open("dokumenti/maticne_knjige/Illia.png", "rb") as f_rodj:
-                st.download_button("👶 ILLIA MLINAR", data=f_rodj.read(), file_name="Illia.png", mime="application/png", key="mk_illia")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'Illia.png' nije pronađena u mapi 'maticne_knjige'.")
-            
-      
-        try:
-            with open("dokumenti/maticne_knjige/Jandria.png", "rb") as f_rodj:
-                st.download_button("👶 JANDRIA MLINAR", data=f_rodj.read(), file_name="Jandria.png", mime="application/png", key="mk_jandria")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'Jandria.png' nije pronađena u mapi 'maticne_knjige'.")
-
-        try:
-            with open("dokumenti/maticne_knjige/Vasilj.png", "rb") as f_rodj:
-                st.download_button("👶 VASILJ MLINAR", data=f_rodj.read(), file_name="Vasilj.png", mime="application/png", key="mk_vasilj")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'Vasilj.png' nije pronađena u mapi 'maticne_knjige'.")
-    
-
-        try:
-            with open("dokumenti/maticne_knjige/Josip.png", "rb") as f_rodj:
-                st.download_button("👶 JOSIP MLINAR", data=f_rodj.read(), file_name="Josip.png", mime="application/png", key="mk_josip")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'Josip.png' nije pronađena u mapi 'maticne_knjige'.")
-            
-      
-        try:
-            with open("dokumenti/maticne_knjige/Jovan.png", "rb") as f_rodj:
-                st.download_button("👶 JOVAN MLINAR", data=f_rodj.read(), file_name="Jovan.png", mime="application/png", key="mk_jovan")
-        except FileNotFoundError:
-            st.caption("⚠️ Datoteka 'Jovan.png' nije pronađena u mapi 'maticne_knjige'.")
-
-# --- 4. FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE IZ BAZE ---
-col_ikona1, col_ikona2, col_ikona3, _ = st.columns([1, 1, 1, 4])
+# Pomoćna funkcija za automatsko određivanje ispravnog MIME tipa datoteke
+def dohvati_mime_tip(ime_datoteke):
+    ime_nisko = ime_datoteke.lower()
+    if ime_nisko.endswith('.pdf'): return "application/pdf"
+    elif ime_nisko.endswith(('.jpg', '.jpeg')): return "image/jpeg"
+    elif ime_nisko.endswith('.png'): return "image/png"
+    elif ime_nisko.endswith('.xlsx'): return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    elif ime_nisko.endswith('.docx'): return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return "application/octet-stream"
 
 with col_ikona1:
     with st.popover("📋 Posjedovni Listovi"):
         st.markdown("### 📄 Opći katastarski dokumenti")
         st.write("Preuzmite posjedovne listove:")
         
-        # Povlačimo opće dokumente vezane uz ID 888888
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 888888")
         svi_opci = cursor.fetchall()
         
@@ -185,7 +137,7 @@ with col_ikona1:
                         label=f"📥 {d_ime}",
                         data=f_bajtovi,
                         file_name=d_ime,
-                        mime="application/pdf",
+                        mime=dsub_mime if (dsub_mime := dohvati_mime_tip(d_ime)) else "application/pdf",
                         key=f"dl_opci_{d_ime}"
                     )
         else:
@@ -196,7 +148,6 @@ with col_ikona2:
         st.markdown("### 🏛️ Matične knjige - državni arhiv")
         st.write("Preuzmite obiteljsku arhivu:")
         
-        # Povlačimo matične knjige vezane uz ID 777777
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 777777")
         sve_mk = cursor.fetchall()
         
@@ -205,11 +156,15 @@ with col_ikona2:
                 if sadrzaj and "|||" in sadrzaj:
                     d_ime, b64_kod = sadrzaj.split("|||", 1)
                     f_bajtovi = base64.b64decode(b64_kod)
+                    
+                    # Čistimo naziv za ljepši prikaz na gumbu (npr. "Illia.png" postaje "Illia")
+                    prikaz_ime = d_ime.split('.')[0] if '.' in d_ime else d_ime
+                    
                     st.download_button(
-                        label=f"👶 {d_ime.split('.')[0]} MLINAR",
+                        label=f"👶 {prikaz_ime.upper()} MLINAR",
                         data=f_bajtovi,
                         file_name=d_ime,
-                        mime="image/png",
+                        mime=dohvati_mime_tip(d_ime),
                         key=f"dl_mk_{d_ime}"
                     )
         else:
@@ -228,13 +183,12 @@ with col_ikona3:
                     try:
                         d_ime, b64_kod = sadrzaj_datoteke.split("|||", 1)
                         f_bajtovi = base64.b64decode(b64_kod)
-                        mime_tip = "application/pdf" if d_ime.lower().endswith('.pdf') else "image/png"
                         
                         st.download_button(
                             label=f"🔹 Preuzmi: {d_ime}",
                             data=f_bajtovi,
                             file_name=d_ime,
-                            mime=mime_tip,
+                            mime=dohvati_mime_tip(d_ime),
                             key=f"dl_g_{d_ime}"
                         )
                     except Exception: pass
