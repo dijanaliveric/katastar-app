@@ -4,8 +4,12 @@ import streamlit as st
 import base64
 import warnings
 
-# 1. GLAVNE POSTAVKE
-st.set_page_config(page_title="Katastar Arhiva", layout="wide")
+st.set_page_config(
+    page_title="Katastar Arhiva - Pregled", 
+    layout="wide",
+    initial_sidebar_state="expanded"  
+)
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 ## =========================================================================
