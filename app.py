@@ -104,14 +104,14 @@ if izbor == "🗺️ Pregled i pretraga čestica":
         st.dataframe(df, width='stretch', hide_index=True)
 
 # --- OPCIJA 2: VELIKI PREGLED POSJEDOVNIH LISTOVA PREKO CIJELOG EKRANA ---
-elif izbor == "📋 Posjedovni listovi":
+elif izbor == "📋 Opći posjedovni listovi":
     st.title("📋 Opći Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-    svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    # Izvlačimo čisti tekst iz torke pomoću r[0]
+    svi_pl = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if svi_pl:
         pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
-        # POPRAVLJENO: Početno prazno polje na vrhu selektora
         odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista za pregled:", [""] + pl_imena)
         
         if odabrani_pl_ime != "":
@@ -124,9 +124,9 @@ elif izbor == "📋 Posjedovni listovi":
 
 # --- OPCIJA 3: VELIKI PREGLED MATIČNIH KNJIGA PREKO CIJELOG EKRANA ---
 elif izbor == "📜 Matične knjige":
-    st.title("📜 Državni Arhiv Zadar)")
+    st.title("📜 Arhiv Matičnih Knjiga (Državni Arhiv Zadar)")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-    sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    sve_mk = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if sve_mk:
         mk_imena = []
@@ -135,7 +135,6 @@ elif izbor == "📜 Matične knjige":
             cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
             mk_imena.append(f"Arhiv: {cisto_ime.upper()}")
             
-        # POPRAVLJENO: Početno prazno polje na vrhu selektora
         odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
         
         if odabir_osobe != "":
@@ -147,8 +146,8 @@ elif izbor == "📜 Matične knjige":
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
 # --- OPCIJA 4: PREGLED DOKUMENATA OD RODBINE PREKO CIJELOG EKRANA ---
-elif izbor == "📂 Dokumenti":
-    st.title("📂 Pregled Obiteljskih Dokumenata")
+elif izbor == "📂 Dokumenti od rodbine":
+    st.title("📂 Pregled Dokumenata Poslanih s Terena")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
     svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
@@ -161,12 +160,9 @@ elif izbor == "📂 Dokumenti":
             st.write("---")
             naziv_datoteke, b64_sadrzaj = svi_pos[indeks].split("|||", 1)
             
-            # --- POPRAVLJENO: Razlikujemo slike i PDF-ove kako ne bi bilo PIL greške ---
             if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                # Ako je slika, crtamo je zaštićenu preko cijelog zaslona
                 st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
             elif naziv_datoteke.lower().endswith('.pdf'):
-                # Ako je stari ili novi PDF, ugrađujemo ga u veliki prozor sa skrivenom gornjom trakom alata (#toolbar=0)
                 pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
                 st.markdown(pdf_prikaz, unsafe_allow_html=True)
             else:
