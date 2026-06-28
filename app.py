@@ -105,6 +105,32 @@ st.write("---")
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
 st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
+st.markdown("""
+    <style>
+    /* Isključujemo mogućnost označavanja i povlačenja slika mišem */
+    img {
+        -webkit-touch-callout: none; /* Isključuje dugi pritisak na iOS/Safari uređajima */
+        -webkit-user-select: none;   /* Isključuje označavanje na Safariju */
+        -khtml-user-select: none;
+        -moz-user-select: none;      /* Isključuje označavanje na Firefoxu */
+        -ms-user-select: none;
+        user-select: none;           /* Standardno isključivanje označavanja teksta/slika */
+        pointer-events: none;        /* Onemogućuje bilo kakve klikove mišem izravno na sliku */
+    }
+    </style>
+    
+    <script>
+    # JavaScript koji u pozadini potpuno gasi desni klik miša na cijeloj stranici
+    document.addEventListener('contextmenu', event => event.preventDefault());
+    
+    # Isključujemo uobičajene kratice na tipkovnici za kopiranje (Ctrl+C, Ctrl+S)
+    document.onkeydown = function(e) {
+        if (e.ctrlKey && (e.keyCode === 67 || e.keyCode === 86 || e.keyCode === 83 || e.keyCode === 73)) {
+            return false;
+        }
+    };
+    </script>
+""", unsafe_allow_html=True)
 
 
 # --- 4. FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE IZ BAZE (UNIVERZALNI MIME) ---
@@ -119,7 +145,6 @@ def dohvati_mime_tip(ime_datoteke):
     elif ime_nisko.endswith('.xlsx'): return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     elif ime_nisko.endswith('.docx'): return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     return "application/octet-stream"
-
 with col_ikona1:
     with st.popover("📋 Posjedovni Listovi"):
         st.markdown("### 📄 Opći katastarski dokumenti")
@@ -130,10 +155,14 @@ with col_ikona1:
             for (sadrzaj,) in svi_opci:
                 if sadrzaj and "|||" in sadrzaj:
                     d_ime, b64_kod = sadrzaj.split("|||", 1)
-                    st.caption(f"🔹 **Pregled: {d_ime}**")
-                    # Izravno ugrađujemo PDF u popover prozor bez gumba za download
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_kod}" width="100%" height="500" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                    izvorni_bajtovi = base64.b64decode(b64_kod)
+                    
+                    # PRIKAZ PREKO CIJELOG EKRANA LAPTOPA (BEZ ALATA I IZBORNIKA)
+                    st.image(
+                        izvorni_bajtovi, 
+                        caption=f"Pregled dokumenta: {d_ime}", 
+                        use_container_width=True # Rasteže sliku preko cijelog raspoloživog prostora ekrana
+                    )
                     st.write("---")
         else:
             st.caption("⚠️ Nema unesenih općih posjedovnih listova u bazi.")
@@ -149,10 +178,12 @@ with col_ikona2:
                 if sadrzaj and "|||" in sadrzaj:
                     d_ime, b64_kod = sadrzaj.split("|||", 1)
                     prikaz_ime = d_ime.split('.')[0].upper() if '.' in d_ime else d_ime
-                    st.markdown(f"👶 **{prikaz_ime} MLINAR**")
-                    # Izravno crtamo sliku pretka na ekran iz bajtova
-                    izvorni_bajtovi = base64.b64decode(b64_kod)
-                    st.image(izvorni_bajtovi, use_container_width="always")
+                    
+                    st.image(
+                        base64.b64decode(b64_kod), 
+                        caption=f"👶 {prikaz_ime} MLINAR", 
+                        use_container_width=True
+                    )
                     st.write("---")
         else:
             st.caption("⚠️ Nema unesenih matičnih knjiga u bazi.")
@@ -168,14 +199,13 @@ with col_ikona3:
                 if sadrzaj_datoteke and "|||" in sadrzaj_datoteke:
                     try:
                         d_ime, b64_kod = sadrzaj_datoteke.split("|||", 1)
-                        st.caption(f"📄 **{d_ime}**")
                         
-                        if d_ime.lower().endswith(('.jpg', '.jpeg', '.png')):
-                            izvorni_bajtovi = base64.b64decode(b64_kod)
-                            st.image(izvorni_bajtovi, use_container_width="always")
-                        elif d_ime.lower().endswith('.pdf'):
-                            pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_kod}" width="100%" height="500" type="application/pdf"></iframe>'
-                            st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                        # Sve formate prikazujemo isključivo kao slike radi zaštite od preuzimanja i uređivanja
+                        st.image(
+                            base64.b64decode(b64_kod), 
+                            caption=f"Poslani dokument: {d_ime}", 
+                            use_container_width=True
+                        )
                         st.write("---")
                     except Exception: pass
         else:
