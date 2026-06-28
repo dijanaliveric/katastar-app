@@ -4,9 +4,58 @@ import streamlit as st
 import base64
 import warnings
 
-# 1. GLAVNE POSTAVKE STRANICE
-st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
+st.set_page_config(
+    page_title="Katastar Arhiva - Pregled", 
+    layout="wide",
+    initial_sidebar_state="expanded"  
+)
+
 warnings.filterwarnings("ignore", category=UserWarning)
+
+# =========================================================================
+# 🔒 GLOBALNI ŠTIT: UKLANJA FORK, ČUVA GUMB ZA PONOVNO OTVARANJE SIDEBARA
+# =========================================================================
+st.markdown("""
+    <style>
+    /* 1. Sakriva isključivo ikonu GitHuba (Fork), Deploy gumb i tri točkice u desnom kutu */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
+    header div div:has(button) div, 
+    header div[class^="st-emotion-cache"] div:has(button) {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* 2. Prisno osiguravamo da je gumb za vraćanje Sidebara na mobitelu (strelica lijevo) vidljiv i prohodan */
+    [data-testid="stSidebarCollapseButton"], 
+    button[aria-label="Open sidebar"], 
+    header button {
+        display: block !important;
+        visibility: visible !important;
+    }
+    
+    /* 3. Isključuje označavanje slika i dugi pritisak */
+    img {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* 4. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA) */
+    @media (max-width: 767px) {
+        h1 {
+            font-size: 1.4rem !important;
+            line-height: 1.2 !important;
+        }
+        h2, h3, .stSubheader {
+            font-size: 1.1rem !important;
+        }
+        .block-container {
+            padding-top: 2rem !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 
 # --- JEDNOSTAVNA ZAŠTITA ZA ULAZ ---
 if "autentificiran" not in st.session_state:
@@ -20,72 +69,94 @@ if not st.session_state["autentificiran"]:
         if u_korisnik == st.secrets["credentials"]["username"] and u_lozinka == st.secrets["credentials"]["password"]:
             st.session_state["autentificiran"] = True
             st.rerun()
-        else: st.error("❌ Nevazeće lozinke.")
+        else:
+            st.error("❌ Nevazeće lozinke.")
     st.stop()
 
 # --- SPAJANJE NA BAZU S TIMEOUTOM ---
 conn = psycopg2.connect(
-    host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
-    database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
-    password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
+    host=st.secrets["baza"]["host"],
+    port=st.secrets["baza"]["port"],
+    database=st.secrets["baza"]["database"],
+    user=st.secrets["baza"]["user"],
+    password=st.secrets["baza"]["password"],
+    sslmode=st.secrets["baza"]["sslmode"],
     options="-c statement_timeout=5000"
 )
 cursor = conn.cursor()
 
-# --- 🔒 KONAČNA PAMETNA ZAŠTITA I SAKRIVANJE GUMBA (FORK/DEPLOY) ---
+# --- 🔒 MAKSIMALNA ZAŠTITA SLIKA (CSS ZABRANA SPREMANJA) ---
+st.markdown("<style>img {-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;pointer-events:none;}</style>", unsafe_allow_html=True)
+
+# =========================================================================
+# 🧭 ELEGANTAN BOČNI IZBORNIK (SIDEBAR) - UNIŠTAVA POPUSH-PROZORE
+# =========================================================================
+st.sidebar.title("🧭 Arhiva Navigacija")
+izbor = st.sidebar.radio(
+    "Odaberite što želite gledati:",
+    ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
+)
+cursor = conn.cursor()
+
+# Osiguravamo tablice i polja u bazi podataka na internetu
+try:
+    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS katastarska_opcina TEXT;")
+    conn.commit()
+except Exception:
+    if conn: conn.rollback()
+#st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
+
+
+# --- POPRAVLJENO: SAKRIVA SAMO DESNU STRANU HEADERA (FORK/DEPLOY), ČUVA GUMB ZA SIDEBAR ---
 st.markdown("""
     <style>
-    /* Sakriva Fork, Deploy i izbornik na SVIM uređajima (laptop i mobitel) */
-    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu {
+    /* =========================================================================
+       1. UNIVERZALNE POSTAVKE ZA SVE UREĐAJE (LAPTOP I MOBITEL)
+       ========================================================================= */
+    /* Kirurški precizno skriva samo desni dio trake (Fork mačku, Deploy i izbornik) */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, header div[class^="st-emotion-cache-"] div[class^="st-emotion-cache-"] {
         display: none !important;
         visibility: hidden !important;
     }
     
-    /* Sakriva nativni gumb za zatvaranje sidebara na mobitelu da korisnik ne može sakriti sidebar */
-    @media (max-width: 767px) {
-        [data-testid="stSidebarCollapseButton"] {
-            display: none !important;
-        }
-        /* Smanjujemo naslove na mobitelu */
-        h1 { font-size: 1.3rem !important; line-height: 1.2 !important; }
-        h2, h3, .stSubheader { font-size: 1.05rem !important; }
-        .block-container { padding-top: 1rem !important; }
+    /* Isključuje označavanje slika i dugi pritisak */
+    img {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
     }
-    
-    /* Zaštita slika protiv krađe i desnog klika */
-    img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-    div[data-testid='stImage'] img { pointer-events: none !important; }
+
+    /* =========================================================================
+       2. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA)
+       ========================================================================= */
+    @media (max-width: 767px) {
+        /* Smanjuje glavni naslov (st.title) na mobitelu da stane u jedan red */
+        h1 {
+            font-size: 1.5rem !important;
+            line-height: 1.2 !important;
+        }
+        
+        /* Smanjuje podnaslove (st.subheader) na mobitelu */
+        h2, h3, .stSubheader {
+            font-size: 1.1rem !important;
+        }
+        
+        /* Prilagođava razmak na vrhu ekrana za mobitele */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# =========================================================================
-# 🧭 PAMETNA RESPONSIVNA NAVIGACIJA (RAZDVOJENO ZA WEB I MOBITEL)
-# =========================================================================
-popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Opći posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti od rodbine"]
 
-# Provjeravamo ima li aplikacija pokrenut query parametar ili se koristi headless mod (zamjena za detector)
-je_mobitel = st.get_option("server.headless")
-
-if not je_mobitel:
-    # --- ZA WEB (LAPTOP): Prekrasni, moderni Sidebar s lijeve strane ---
-    st.sidebar.title("🧭 Arhiva Navigacija")
-    izbor = st.sidebar.radio("Odaberite što želite gledati:", popis_opcija)
-else:
-    # --- ZA MOBITEL: Čisti i fiksni padajući izbornik na samom vrhu ekrana ---
-    st.write("### 🧭 Obiteljska Arhiva Navigacija")
-    izbor = st.selectbox("Odaberite odjeljak za pregled:", popis_opcija)
-    st.write("---")
-
-# Ovdje se kôd privremeno prekida, odmah šaljem ostatak!
-# =========================================================================
-# 🚀 LOGIKA PRIKAZA EKRANA (Identična i čista za oba sučelja)
-# =========================================================================
-
-# --- 🗺️ EKRAN 1: PREGLED ČESTICA ---
+# --- OPCIJA 1: PREGLED ČESTICA ---
 if izbor == "🗺️ Pregled i pretraga čestica":
     st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
+    
+
     if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
-    up_doc = st.file_uploader("Učitaj novi obiteljski dokument s terena:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
+    up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
     if up_doc is not None:
         try:
             b64 = base64.b64encode(up_doc.read()).decode('utf-8')
@@ -127,19 +198,22 @@ if izbor == "🗺️ Pregled i pretraga čestica":
                 st.write(f"👤 Korisnik: {vl} | 💬 {p_n}")
                 if dat and "|||" in dat:
                     ime, b64_kod = dat.split("|||", 1)
-                    st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
-                    if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
+                    if ime.lower().endswith(('.jpg', '.jpeg', '.png')): 
+                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+
+                         st.image(base64.b64decode(b64_kod), use_container_width=True)
     else:
         import pandas as pd
         upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
         df = pd.read_sql_query(upit, conn)
         st.dataframe(df, width='stretch', hide_index=True)
 
-# --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
-elif izbor == "📋 Opći posjedovni listovi":
-    st.title("📋 Opći Katastarski Posjedovni Listovi")
+# --- OPCIJA 2: VELIKI PREGLED POSJEDOVNIH LISTOVA PREKO CIJELOG EKRANA ---
+elif izbor == "📋 Posjedovni listovi":
+    st.title("📋 Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-    svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    # Izvlačimo čisti tekst iz torke pomoću r[0]
+    svi_pl = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if svi_pl:
         pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
@@ -149,21 +223,24 @@ elif izbor == "📋 Opći posjedovni listovi":
             indeks = pl_imena.index(odabrani_pl_ime)
             st.write("---")
             b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
-            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
-    else: st.info("U bazi podataka trenutno nema unesenih općih posjedovnih listova.")
 
-# --- 📜 EKRAN 3: MATIČNE KNJIGE ---
+            st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+    else: 
+        st.info("U bazi podataka trenutno nema unesenih posjedovnih listova.")
+
+# --- OPCIJA 3: VELIKI PREGLED MATIČNIH KNJIGA PREKO CIJELOG EKRANA ---
 elif izbor == "📜 Matične knjige":
     st.title("📜 Arhiv Matičnih Knjiga (Državni Arhiv Zadar)")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-    sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    sve_mk = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if sve_mk:
         mk_imena = []
         for f in sve_mk:
             ime_datoteke = f.split("|||", 1)[0]
             cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
-            mk_imena.append(f"Arhiv: {cisto_ime.upper()} MLINAR")
+            mk_imena.append(f"Arhiv: {cisto_ime.upper()}")
             
         odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
         
@@ -171,14 +248,18 @@ elif izbor == "📜 Matične knjige":
             indeks = mk_imena.index(odabir_osobe)
             st.write("---")
             b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
+           
+            st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
             st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
-    else: st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
-# --- 📂 EKRAN 4: DOKUMENTI OD RODBINE ---
-elif izbor == "📂 Dokumenti od rodbine":
-    st.title("📂 Pregled Dokumenata Poslanih s Terena")
+    else: 
+        st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
+
+
+elif izbor == "📂 Dokumenti":
+    st.title("📂 Pregled Obiteljskih Dokumenata")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-    svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if svi_pos:
         p_imena = [f.split("|||", 1)[0] for f in svi_pos]
@@ -189,13 +270,42 @@ elif izbor == "📂 Dokumenti od rodbine":
             st.write("---")
             naziv_datoteke, b64_sadrzaj = svi_pos[indeks].split("|||", 1)
             
+                       # --- POPRAVLJENO: Razlikujemo slike, PDF-ove, Excel i Word formate ---
             if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                # Slike prikazujemo u punoj veličini
+               
+                    st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                    st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+ 
             elif naziv_datoteke.lower().endswith('.pdf'):
+                # PDF ugrađujemo na ekran
                 pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
                 st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                
             elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
-                st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=base64.b64decode(b64_sadrzaj), file_name=naziv_datoteke, key=f"dl_{naziv_datoteke}")
-    else: st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
+                # Za Excel i Word nudimo siguran gumb za download jer se ne mogu nacrtati kao slike
+                izvorni_bajtovi = base64.b64decode(b64_sadrzaj)
+                
+                # Određujemo točan MIME tip ovisno o tome je li Word ili Excel
+                if naziv_datoteke.lower().endswith(('.xlsx', '.xls')):
+                    m_tip = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ikona_gumba = "📊"
+                else:
+                    m_tip = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ikona_gumba = "📝"
+                
+                st.info(f"{ikona_gumba} Datoteka '{naziv_datoteke}' je uredski dokument. Kliknite ispod za preuzimanje i pregled:")
+                st.download_button(
+                    label=f"{ikona_gumba} Preuzmi: {naziv_datoteke}",
+                    data=izvorni_bajtovi,
+                    file_name=naziv_datoteke,
+                    mime=m_tip,
+                    key=f"dl_rodbina_{naziv_datoteke}"
+                )
+            else:
+                st.warning(f"Format datoteke '{naziv_datoteke}' nije podržan za izravan pregled.")
+
+    else: 
+        st.info("Nijedan dokument nije učitan preko uploadera.")
 
 conn.close()
