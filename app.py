@@ -55,7 +55,7 @@ try:
     conn.commit()
 except Exception:
     if conn: conn.rollback()
-st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
+#st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
 # --- SAKRIVANJE GUMBA (FORK/DEPLOY), ZAŠTITA I AUTOMATSKO ZATVARANJE IZBORNIKA NA MOBITELU ---
 st.markdown("""
