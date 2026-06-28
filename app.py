@@ -12,27 +12,49 @@ st.set_page_config(
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# =========================================================================
-# 🔒 GLOBALNI ŠTIT: UKLANJA FORK, ČUVA GUMB ZA PONOVNO OTVARANJE SIDEBARA
-# =========================================================================
+# --- GLOBALNI ŠTIT: SAKRIVA FORK I DEPLOY, OSIGURAVA RAD SIDEBARA ---
 st.markdown("""
-       <style>
-    /* Potpuno i trajno briše cijelu gornju traku i Fork gumb na laptopu i mobitelu */
-    [data-testid="stHeader"], header, .stDeployButton, [data-testid="stGithubIcon"], #MainMenu {
+    <style>
+    /* 1. VRACAMO KONEKCIJU: Dopuštamo glavnoj traki da bude aktivna kako bi Sidebar radio */
+    [data-testid="stHeader"], header {
+        display: block !important;
+        background-color: transparent !important; /* Čini pozadinu trake nevidljivom */
+    }
+
+    /* 2. KIRURŠKI REZ: Sakrivamo isključivo Fork gumb, Deploy gumb i tri točkice u desnom kutu */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
+    header div div div:has(button) {
         display: none !important;
         visibility: hidden !important;
-        height: 0px !important;
     }
     
-    /* Podižemo sadržaj prema gore kako ne bi bilo praznog prostora */
-    .block-container { padding-top: 1rem !important; }
+    /* 3. Sakrivamo tvorničku malu strelicu u kutu jer sada imamo vaš vlastiti veliki gumb s logom */
+    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"] {
+        display: none !important;
+    }
     
-    /* Isključuje označavanje slika */
+    /* 4. Prilagodba fontova i slika */
     img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     div[data-testid='stImage'] img { pointer-events: none !important; }
+    
+    @media (max-width: 767px) {
+        h1 { font-size: 1.4rem !important; line-height: 1.2 !important; }
+        h2, h3, .stSubheader { font-size: 1.1rem !important; }
+        .block-container { padding-top: 1.5rem !important; }
+    }
     </style>
-
 """, unsafe_allow_html=True)
+
+
+# 1. DINAMIČKO STANJE SIDEBARA
+if "stanje_sidebara" not in st.session_state:
+    st.session_state["stanje_sidebara"] = "expanded"
+
+st.set_page_config(
+    page_title="Katastar Arhiva - Pregled", 
+    layout="wide",
+    initial_sidebar_state=st.session_state["stanje_sidebara"] # Povezano s našom varijablom!
+)
 
 
 # --- JEDNOSTAVNA ZAŠTITA ZA ULAZ ---
@@ -65,6 +87,23 @@ cursor = conn.cursor()
 
 # --- 🔒 MAKSIMALNA ZAŠTITA SLIKA (CSS ZABRANA SPREMANJA) ---
 st.markdown("<style>img {-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;pointer-events:none;}</style>", unsafe_allow_html=True)
+
+# =========================================================================
+# 🏛️ OBITELJSKI LOGO I NATIVNI GUMB ZA VRAĆANJE SIDEBARA
+# =========================================================================
+logo_col1, logo_col2 = st.columns([3, 1]) # Omjer stupaca kako bi gumb bio s desne strane
+
+with logo_col1:
+    st.markdown("### 🗺️ Obiteljska Arhiva Katastra")
+
+with logo_col2:
+    # Klikom na ovaj gumb prisilno mijenjamo stanje u 'expanded' i osvježavamo ekran
+    if st.button("🧭 Otvori Izbornik", key="nativni_sidebar_gumb"):
+        st.session_state["stanje_sidebara"] = "expanded"
+        st.rerun()
+
+st.write("---")
+
 
 # =========================================================================
 # 🧭 ELEGANTAN BOČNI IZBORNIK (SIDEBAR) - UNIŠTAVA POPUSH-PROZORE
