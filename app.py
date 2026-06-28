@@ -164,12 +164,61 @@ with col_ikona2:
         except FileNotFoundError:
             st.caption("⚠️ Datoteka 'Jovan.png' nije pronađena u mapi 'maticne_knjige'.")
 
+# --- 4. FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE IZ BAZE ---
+col_ikona1, col_ikona2, col_ikona3, _ = st.columns([1, 1, 1, 4])
+
+with col_ikona1:
+    with st.popover("📋 Posjedovni Listovi"):
+        st.markdown("### 📄 Opći katastarski dokumenti")
+        st.write("Preuzmite posjedovne listove:")
+        
+        # Povlačimo opće dokumente vezane uz ID 888888
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 888888")
+        svi_opci = cursor.fetchall()
+        
+        if svi_opci:
+            for (sadrzaj,) in svi_opci:
+                if sadrzaj and "|||" in sadrzaj:
+                    d_ime, b64_kod = sadrzaj.split("|||", 1)
+                    f_bajtovi = base64.b64decode(b64_kod)
+                    st.download_button(
+                        label=f"📥 {d_ime}",
+                        data=f_bajtovi,
+                        file_name=d_ime,
+                        mime="application/pdf",
+                        key=f"dl_opci_{d_ime}"
+                    )
+        else:
+            st.caption("⚠️ Nema unesenih općih posjedovnih listova u bazi.")
+
+with col_ikona2:
+    with st.popover("📜 Matične Knjige"):
+        st.markdown("### 🏛️ Matične knjige - državni arhiv")
+        st.write("Preuzmite obiteljsku arhivu:")
+        
+        # Povlačimo matične knjige vezane uz ID 777777
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 777777")
+        sve_mk = cursor.fetchall()
+        
+        if sve_mk:
+            for (sadrzaj,) in sve_mk:
+                if sadrzaj and "|||" in sadrzaj:
+                    d_ime, b64_kod = sadrzaj.split("|||", 1)
+                    f_bajtovi = base64.b64decode(b64_kod)
+                    st.download_button(
+                        label=f"👶 {d_ime.split('.')[0]} MLINAR",
+                        data=f_bajtovi,
+                        file_name=d_ime,
+                        mime="image/png",
+                        key=f"dl_mk_{d_ime}"
+                    )
+        else:
+            st.caption("⚠️ Nema unesenih matičnih knjiga u bazi.")
 
 with col_ikona3:
-    with st.popover("📂 Dokumenti"):
-        st.markdown("### 📁 Pregled obiteljskih dokumenata")
+    with st.popover("📂 Poslani Dokumenti"):
+        st.markdown("### 📁 Dokumenti od rodbine")
         
-        # Čitamo direktno s interneta dokumente vezane uz opći ID 999999
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 999999")
         svi_poslani_doc = cursor.fetchall()
         
@@ -191,6 +240,7 @@ with col_ikona3:
                     except Exception: pass
         else:
             st.info("Nema učitanih dokumenata. Iskoristite uploader na vrhu.")
+
 
 # Osiguravamo da polje katastarska_opcina postoji u bazi
 #try:
