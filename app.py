@@ -106,41 +106,45 @@ except Exception:
     if conn: conn.rollback()
 #st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
-# =========================================================================
-# 🔒 POPRAVLJENI ŠTIT: UKLANJA SAMO DESNE IKONE (FORK), VRAĆA GUMB ZA SIDEBAR
-# =========================================================================
+
+# --- POPRAVLJENO: SAKRIVA SAMO DESNU STRANU HEADERA (FORK/DEPLOY), ČUVA GUMB ZA SIDEBAR ---
 st.markdown("""
     <style>
-    /* 1. VRACAMO HEADER: Osiguravamo da je gornja traka aktivna kako bi se vidjela strelica za Sidebar */
-    [data-testid="stHeader"], header {
-        display: block !important;
-        background-color: transparent !important; /* Čini traku nevidljivom da ne smeta dizajnu */
-    }
-
-    /* 2. KIRURŠKI REZ: Sakrivamo isključivo Fork gumb, Deploy gumb i tri točkice u desnom kutu */
-    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
-    header div div div:has(button) {
+    /* =========================================================================
+       1. UNIVERZALNE POSTAVKE ZA SVE UREĐAJE (LAPTOP I MOBITEL)
+       ========================================================================= */
+    /* Kirurški precizno skriva samo desni dio trake (Fork mačku, Deploy i izbornik) */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, header div[class^="st-emotion-cache-"] div[class^="st-emotion-cache-"] {
         display: none !important;
         visibility: hidden !important;
     }
     
-    /* 3. MAKSIMALNA PROHODNOST: Prisno držimo gumb za otvaranje Sidebara vidljivim na mobitelu */
-    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"] {
-        display: block !important;
-        visibility: visible !important;
-        z-index: 999999 !important; /* Podiže strelicu na sam vrh kako bi se uvijek mogla kliknuti prstom */
-    }
-    
-    /* 4. Isključuje označavanje slika i dugi pritisak */
+    /* Isključuje označavanje slika i dugi pritisak */
     img {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
     }
+
+    /* =========================================================================
+       2. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA)
+       ========================================================================= */
     @media (max-width: 767px) {
-        h1 { font-size: 1.4rem !important; line-height: 1.2 !important; }
-        h2, h3, .stSubheader { font-size: 1.1rem !important; }
-        .block-container { padding-top: 2rem !important; }
+        /* Smanjuje glavni naslov (st.title) na mobitelu da stane u jedan red */
+        h1 {
+            font-size: 1.5rem !important;
+            line-height: 1.2 !important;
+        }
+        
+        /* Smanjuje podnaslove (st.subheader) na mobitelu */
+        h2, h3, .stSubheader {
+            font-size: 1.1rem !important;
+        }
+        
+        /* Prilagođava razmak na vrhu ekrana za mobitele */
+        .block-container {
+            padding-top: 2rem !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
