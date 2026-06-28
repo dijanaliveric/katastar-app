@@ -8,6 +8,50 @@ import warnings
 st.set_page_config(page_title="Katastar Arhiva", layout="wide")
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# =========================================================================
+# 🔒 GLOBALNI ŠTIT: UKLANJA FORK ODMAH NA STARTU I PRILAGOĐAVA MOBITELE
+# =========================================================================
+st.markdown("""
+    <style>
+    /* 1. Kirurški precizno skriva isključivo Fork gumb, Deploy gumb i tri točkice na SVIM ekranima */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
+    header div div button:not([data-testid="stSidebarCollapseButton"]) {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* 2. Osiguravamo da je gumb za otvaranje Sidebara na mobitelu UVIJEK vidljiv i prohodan */
+    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"] {
+        display: block !important;
+        visibility: visible !important;
+    }
+    
+    /* 3. Isključuje označavanje slika i dugi pritisak */
+    img {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* 4. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA) */
+    @media (max-width: 767px) {
+        /* Smanjuje naslove da se ne lome ružno na mobitelu */
+        h1 {
+            font-size: 1.4rem !important;
+            line-height: 1.2 !important;
+        }
+        h2, h3, .stSubheader {
+            font-size: 1.1rem !important;
+        }
+        /* Podiže sadržaj na mobitelu prema gore */
+        .block-container {
+            padding-top: 2rem !important;
+        }
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+
 # --- JEDNOSTAVNA ZAŠTITA ZA ULAZ ---
 if "autentificiran" not in st.session_state:
     st.session_state["autentificiran"] = False
