@@ -54,7 +54,7 @@ if izbor == "🗺️ Pregled i pretraga čestica":
     
     # Uploader za rodbinu na vrhu
     if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
-    up_doc = st.file_uploader("Učitaj novi obiteljski dokument s terena:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
+    up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
     if up_doc is not None:
         try:
             b64 = base64.b64encode(up_doc.read()).decode('utf-8')
@@ -104,8 +104,8 @@ if izbor == "🗺️ Pregled i pretraga čestica":
         st.dataframe(df, width='stretch', hide_index=True)
 
 # --- OPCIJA 2: VELIKI PREGLED POSJEDOVNIH LISTOVA PREKO CIJELOG EKRANA ---
-elif izbor == "📋 Opći posjedovni listovi":
-    st.title("📋 Opći Katastarski Posjedovni Listovi")
+elif izbor == "📋 Posjedovni listovi":
+    st.title("📋 Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
     # Izvlačimo čisti tekst iz torke pomoću r[0]
     svi_pl = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
@@ -146,8 +146,8 @@ elif izbor == "📜 Matične knjige":
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
 # --- OPCIJA 4: PREGLED DOKUMENATA OD RODBINE PREKO CIJELOG EKRANA ---
-elif izbor == "📂 Dokumenti od rodbine":
-    st.title("📂 Pregled Dokumenata Poslanih s Terena")
+elif izbor == "📂 Dokumenti":
+    st.title("📂 Pregled Obiteljskih Dokumenata")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
     svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
