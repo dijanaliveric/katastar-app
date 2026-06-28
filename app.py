@@ -6,6 +6,17 @@ import urllib.parse
 import base64 
 import warnings
 
+conn = psycopg2.connect(
+    host=st.secrets["baza"]["host"],
+    port=st.secrets["baza"]["port"],
+    database=st.secrets["baza"]["database"],
+    user=st.secrets["baza"]["user"],
+    password=st.secrets["baza"]["password"],
+    sslmode=st.secrets["baza"]["sslmode"]
+)
+cursor = conn.cursor()
+
+
 # OVO GASI DOSADNA PANDAS UPOZORENJA U TERMINALU
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -44,50 +55,55 @@ upload_mapa = "dokumenti/rodbina_upload"
 if not os.path.exists(upload_mapa):
     os.makedirs(upload_mapa)
 
-# Dodajemo dinamički ključ 
-datoteka = st.file_uploader(
-    "Učitaj dokument",
+# --- NOVI SQL BASE64 UPLOADER ZA RODBINU ---
+datoteka_uploader = st.file_uploader(
+    "Učitaj novi obiteljski dokument:",
     type=["png", "jpg", "jpeg", "pdf", "xlsx", "docx"],
     key=f"glavni_gornji_uploader_{st.session_state['uploader_kljuc']}",
 )
-# Kada rodbina ubaci dokument
-if datoteka is not None:
-    # 1. ZAŠTITA: Provjera ekstenzije u kodu za svaki slučaj
-    ekstenzija = datoteka.name.split(".")[-1].lower()
+
+if datoteka_uploader is not None:
+    ekstenzija = datoteka_uploader.name.split(".")[-1].lower()
     if ekstenzija not in ["png", "jpg", "jpeg", "pdf", "xlsx", "docx"]:
-        st.error("❌ Greška: Ovaj format datoteke nije dozvoljen za prijenos!")
+        st.error("❌ Greška: Ovaj format datoteke nije dozvoljen!")
     else:
-        # 2. ZAŠTITA: Uhvati bilo kakvu grešku pri pisanju na disk (npr. pun disk, krivi znakovi u nazivu)
         try:
-            putanja_za_spremiti = os.path.join(upload_mapa, datoteka.name)
-            with open(putanja_za_spremiti, "wb") as f:
-                f.write(datoteka.getbuffer())
+            # 1. Čitamo datoteku s mobitela/računala i pretvaramo je u tekst
+            bajtovi = datoteka_uploader.read()
+            tekstualni_b64 = base64.b64encode(bajtovi).decode('utf-8')
+            kodirani_zapis = f"{datoteka_uploader.name}|||{tekstualni_b64}"
             
-            st.success(f"Uspjesno spremljeno: {datoteka.name}")
+            # 2. Upisujemo dokument izravno u online bazu vezan uz ID 999999
+            cursor.execute(
+                """
+                INSERT INTO povijest_dokumenata 
+                (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    999999,                    # Vežemo uz našu opću česticu
+                    "Poslani dokument",        # Kategorija dokumenta
+                    "Online",                  # Izvor unosa
+                    "2026",                    # Trenutna godina unosa
+                    "Rodbina (Web)",           # Tko je unio
+                    "Dokument poslan izravno s mobitela/računala.",
+                    kodirani_zapis             # Cijela datoteka u obliku teksta
+                ),
+            )
+            conn.commit()
             
-            # Resetiranje uploadera i osvježavanje stranice
+            st.success(f"✅ Uspješno spremljeno u bazu podataka: {datoteka_uploader.name}")
             st.session_state["uploader_kljuc"] += 1
             st.rerun()
-            
         except Exception as e:
-            st.error(f"❌ Doslo je do nepredvidjene greske prilikom spremanja datoteke. Pokusajte ponovno.")
+            if conn: conn.rollback()
+            st.error(f"❌ Došlo je do greške prilikom spremanja u bazu: {e}")
+
 st.write("---")
 
 # --- OSNOVNE POSTAVKE ---
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
 st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
-
-import psycopg2
-import streamlit as st
-conn = psycopg2.connect(
-    host=st.secrets["baza"]["host"],
-    port=st.secrets["baza"]["port"],
-    database=st.secrets["baza"]["database"],
-    user=st.secrets["baza"]["user"],
-    password=st.secrets["baza"]["password"],
-    sslmode=st.secrets["baza"]["sslmode"]
-)
-cursor = conn.cursor()
 
 
 # --- FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE ---
@@ -151,27 +167,30 @@ with col_ikona2:
 
 with col_ikona3:
     with st.popover("📂 Dokumenti"):
-        st.markdown("### 📁 Pregled Obiteljskih Dokumenta")
-        st.write("Preuzmite obiteljske dokumente:")
-
-        sve_datoteke = os.listdir(upload_mapa)
-        if sve_datoteke:
-            for datoteka_ime in sve_datoteke:
-                putanja_datoteke = os.path.join(upload_mapa, datoteka_ime)
-                try:
-                    with open(putanja_datoteke, "rb") as f_preuzmi:
+        st.markdown("### 📁 Pregled obiteljskih dokumenata")
+        
+        # Čitamo direktno s interneta dokumente vezane uz opći ID 999999
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 999999")
+        svi_poslani_doc = cursor.fetchall()
+        
+        if svi_poslani_doc:
+            for (sadrzaj_datoteke,) in svi_poslani_doc:
+                if sadrzaj_datoteke and "|||" in sadrzaj_datoteke:
+                    try:
+                        d_ime, b64_kod = sadrzaj_datoteke.split("|||", 1)
+                        f_bajtovi = base64.b64decode(b64_kod)
+                        mime_tip = "application/pdf" if d_ime.lower().endswith('.pdf') else "image/png"
+                        
                         st.download_button(
-                            label=f"🔹 Preuzmi: {datoteka_ime}",
-                            data=f_preuzmi.read(),
-                            file_name=datoteka_ime,
-                            key=f"dl_gornji_{datoteka_ime}",
+                            label=f"🔹 Preuzmi: {d_ime}",
+                            data=f_bajtovi,
+                            file_name=d_ime,
+                            mime=mime_tip,
+                            key=f"dl_g_{d_ime}"
                         )
-                except Exception:
-                    pass
+                    except Exception: pass
         else:
-            st.info("Nema ucitanih dokumenata. Iskoristite uploader na vrhu.")
-
-st.write("---")
+            st.info("Nema učitanih dokumenata. Iskoristite uploader na vrhu.")
 
 # Osiguravamo da polje katastarska_opcina postoji u bazi
 #try:
