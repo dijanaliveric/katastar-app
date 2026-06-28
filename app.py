@@ -56,26 +56,48 @@ try:
 except Exception:
     if conn: conn.rollback()
 #st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
-
-# --- SAKRIVANJE GUMBA (FORK/DEPLOY), ZAŠTITA I AUTOMATSKO ZATVARANJE IZBORNIKA NA MOBITELU ---
-# --- MAKSIMALNO ČIŠĆENJE GORNJE TRAKE (UKLANJA FORK, DEPLOY I IZBORNIK) ---
+# --- MAKSIMALNO ČIŠĆENJE GORNJE TRAKE I SMANJIVANJE FONTA ZA MOBITELE ---
 st.markdown("""
     <style>
-    /* 1. Potpuno skriva cijelu gornju traku u kojoj se nalaze Fork, Deploy i tri crtice */
-    [data-testid="stHeader"] {
+    /* =========================================================================
+       1. UNIVERZALNE POSTAVKE ZA SVE UREĐAJE (LAPTOP I MOBITEL)
+       ========================================================================= */
+    [data-testid="stHeader"], header, .stDeployButton, [data-testid="stGithubIcon"] {
         display: none !important;
     }
     
-    /* 2. Podiže sadržaj aplikacije malo prema gore jer smo ugasili traku, kako ne bi bilo praznog prostora */
     .block-container {
-        padding-top: 2rem !important;
+        padding-top: 1.5rem !important;
     }
     
-    /* 3. Isključuje označavanje i dugi pritisak prsta na slike na mobitelu */
     img {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
+    }
+
+    /* =========================================================================
+       2. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA)
+       ========================================================================= */
+    @media (max-width: 767px) {
+        /* Prisno skriva gornju traku i na mobilnim preglednicima (iPhone/Android) */
+        div[data-testid="stHeader"], iframe, header {
+            display: none !important;
+            height: 0px !important;
+        }
+        
+        h1 {
+            font-size: 1.6rem !important;
+            line-height: 1.2 !important;
+        }
+        
+        h2, h3, .stSubheader {
+            font-size: 1.2rem !important;
+        }
+        
+        .block-container {
+            padding-top: 0.5rem !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
