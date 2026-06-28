@@ -171,8 +171,8 @@ with col_ikona2:
             st.caption("⚠️ Nema unesenih matičnih knjiga u bazi.")
 
 with col_ikona3:
-    with st.popover("📂 Poslani Dokumenti"):
-        st.markdown("### 📁 Dokumenti od rodbine")
+    with st.popover("📂 Dokumenti"):
+        st.markdown("### 📁 Obiteljski dokumenti")
         
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 999999")
         svi_poslani_doc = cursor.fetchall()
@@ -227,10 +227,11 @@ p_dict = {naziv: id for id, naziv in sva_p}
 with col_f1:
     odabrano_p = st.selectbox("Odaberi područje (lokaciju):", ["Sva područja"] + list(p_dict.keys()))
 
+# --- POPRAVLJENO: Sakrivamo tehničke zapise iz padajućeg izbornika čestica ---
 if odabrano_p == "Sva područja":
-    cursor.execute("SELECT id, broj_cestice FROM cestice")
+    cursor.execute("SELECT id, broj_cestice FROM cestice WHERE broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')")
 else:
-    cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s", (p_dict[odabrano_p],))
+    cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s AND broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')", (p_dict[odabrano_p],))
 
 sve_c = cursor.fetchall()
 c_dict = {broj: id for id, broj in sve_c}
@@ -311,11 +312,13 @@ else:
     if sve_c:
         import pandas as pd
         
+                # --- POPRAVLJENO: Sakrivamo tehničke zapise iz velike Excel tablice ---
         if odabrano_p == "Sva područja":
             upit = """
                 SELECT c.broj_cestice, c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.katastarska_opcina, p.naziv_podrucja, c.oznaka_zemljista, c.povrsina
                 FROM cestice c 
                 JOIN podrucja p ON c.id_podrucja = p.id
+                WHERE c.broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')
             """
             df = pd.read_sql_query(upit, conn)
         else:
@@ -323,10 +326,10 @@ else:
                 SELECT c.broj_cestice, c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.katastarska_opcina, p.naziv_podrucja, c.oznaka_zemljista, c.povrsina
                 FROM cestice c 
                 JOIN podrucja p ON c.id_podrucja = p.id
-                WHERE c.id_podrucja = %s
+                WHERE c.id_podrucja = %s AND c.broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')
             """
             df = pd.read_sql_query(upit, conn, params=(p_dict[odabrano_p],))
-        
+
         preimenovani_stupci = {
             "broj_cestice": "Broj čestice",
             "zk_ulozak": "Broj ZK uloška",
