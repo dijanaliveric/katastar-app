@@ -3,11 +3,11 @@ import psycopg2
 import streamlit as st
 import base64
 import warnings
-
+# 1. POSTAVKE STRANICE
 st.set_page_config(
     page_title="Katastar Arhiva - Pregled", 
     layout="wide",
-    initial_sidebar_state="expanded"  
+    initial_sidebar_state="expanded" 
 )
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -16,44 +16,22 @@ warnings.filterwarnings("ignore", category=UserWarning)
 # 🔒 GLOBALNI ŠTIT: UKLANJA FORK, ČUVA GUMB ZA PONOVNO OTVARANJE SIDEBARA
 # =========================================================================
 st.markdown("""
-    <style>
-    /* 1. Sakriva isključivo ikonu GitHuba (Fork), Deploy gumb i tri točkice u desnom kutu */
-    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
-    header div div:has(button) div, 
-    header div[class^="st-emotion-cache"] div:has(button) {
+       <style>
+    /* Potpuno i trajno briše cijelu gornju traku i Fork gumb na laptopu i mobitelu */
+    [data-testid="stHeader"], header, .stDeployButton, [data-testid="stGithubIcon"], #MainMenu {
         display: none !important;
         visibility: hidden !important;
+        height: 0px !important;
     }
     
-    /* 2. Prisno osiguravamo da je gumb za vraćanje Sidebara na mobitelu (strelica lijevo) vidljiv i prohodan */
-    [data-testid="stSidebarCollapseButton"], 
-    button[aria-label="Open sidebar"], 
-    header button {
-        display: block !important;
-        visibility: visible !important;
-    }
+    /* Podižemo sadržaj prema gore kako ne bi bilo praznog prostora */
+    .block-container { padding-top: 1rem !important; }
     
-    /* 3. Isključuje označavanje slika i dugi pritisak */
-    img {
-        -webkit-touch-callout: none;
-        -webkit-user-select: none;
-        user-select: none;
-    }
-
-    /* 4. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA) */
-    @media (max-width: 767px) {
-        h1 {
-            font-size: 1.4rem !important;
-            line-height: 1.2 !important;
-        }
-        h2, h3, .stSubheader {
-            font-size: 1.1rem !important;
-        }
-        .block-container {
-            padding-top: 2rem !important;
-        }
-    }
+    /* Isključuje označavanje slika */
+    img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+    div[data-testid='stImage'] img { pointer-events: none !important; }
     </style>
+
 """, unsafe_allow_html=True)
 
 
@@ -92,6 +70,24 @@ st.markdown("<style>img {-webkit-touch-callout:none;-webkit-user-select:none;use
 # 🧭 ELEGANTAN BOČNI IZBORNIK (SIDEBAR) - UNIŠTAVA POPUSH-PROZORE
 # =========================================================================
 st.sidebar.title("🧭 Arhiva Navigacija")
+# =========================================================================
+# 🏛️ FIKSNI LOGO I GUMB ZA VRAĆANJE SIDEBARA (ZAMJENA NA KLIK)
+# =========================================================================
+# Stvaramo lijepu gornju traku s naslovom i gumbom koji uvijek vraća Sidebar
+logo_col1, logo_col2 = st.columns([3, 1])
+
+with logo_col1:
+    st.markdown("### 🗺️ Obiteljska Arhiva")
+
+with logo_col2:
+    # Kada korisnik klikne ovaj gumb, Streamlit automatski ponovno aktivira i širi Sidebar
+    if st.button("🧭 Otvori Izbornik", key="vrate_sidebar_gumb"):
+        st.write('<script>window.parent.document.querySelector(".stSidebar").setAttribute("aria-expanded", "true");</script>', unsafe_allow_html=True)
+        st.rerun()
+
+st.write("---")
+
+
 izbor = st.sidebar.radio(
     "Odaberite što želite gledati:",
     ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
