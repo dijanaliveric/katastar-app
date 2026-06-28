@@ -103,6 +103,26 @@ st.write("---")
 
 # --- OSNOVNE POSTAVKE ---
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
+
+# --- KONEKCIJA NA INTERNET BAZU (SUPABASE) ---
+conn = psycopg2.connect(
+    host=st.secrets["baza"]["host"],
+    port=st.secrets["baza"]["port"],
+    database=st.secrets["baza"]["database"],
+    user=st.secrets["baza"]["user"],
+    password=st.secrets["baza"]["password"],
+    sslmode=st.secrets["baza"]["sslmode"],
+    options="-c statement_timeout=5000"  # Parametar protiv smrzavanja ekrana
+)
+cursor = conn.cursor()
+
+# Osiguravamo tablice i polja u bazi podataka na internetu
+try:
+    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS katastarska_opcina TEXT;")
+    conn.commit()
+except Exception:
+    if conn: conn.rollback()
+
 st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
 st.markdown("""
