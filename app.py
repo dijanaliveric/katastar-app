@@ -56,20 +56,21 @@ try:
 except Exception:
     if conn: conn.rollback()
 #st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
-# --- MAKSIMALNO ČIŠĆENJE GORNJE TRAKE I SMANJIVANJE FONTA ZA MOBITELE ---
+
+
+# --- POPRAVLJENO: SAKRIVA SAMO DESNU STRANU HEADERA (FORK/DEPLOY), ČUVA GUMB ZA SIDEBAR ---
 st.markdown("""
     <style>
     /* =========================================================================
        1. UNIVERZALNE POSTAVKE ZA SVE UREĐAJE (LAPTOP I MOBITEL)
        ========================================================================= */
-    [data-testid="stHeader"], header, .stDeployButton, [data-testid="stGithubIcon"] {
+    /* Kirurški precizno skriva samo desni dio trake (Fork mačku, Deploy i izbornik) */
+    .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, header div[class^="st-emotion-cache-"] div[class^="st-emotion-cache-"] {
         display: none !important;
+        visibility: hidden !important;
     }
     
-    .block-container {
-        padding-top: 1.5rem !important;
-    }
-    
+    /* Isključuje označavanje slika i dugi pritisak */
     img {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
@@ -80,27 +81,25 @@ st.markdown("""
        2. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA)
        ========================================================================= */
     @media (max-width: 767px) {
-        /* Prisno skriva gornju traku i na mobilnim preglednicima (iPhone/Android) */
-        div[data-testid="stHeader"], iframe, header {
-            display: none !important;
-            height: 0px !important;
-        }
-        
+        /* Smanjuje glavni naslov (st.title) na mobitelu da stane u jedan red */
         h1 {
-            font-size: 1.6rem !important;
+            font-size: 1.5rem !important;
             line-height: 1.2 !important;
         }
         
+        /* Smanjuje podnaslove (st.subheader) na mobitelu */
         h2, h3, .stSubheader {
-            font-size: 1.2rem !important;
+            font-size: 1.1rem !important;
         }
         
+        /* Prilagođava razmak na vrhu ekrana za mobitele */
         .block-container {
-            padding-top: 0.5rem !important;
+            padding-top: 2rem !important;
         }
     }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- OPCIJA 1: PREGLED ČESTICA ---
 if izbor == "🗺️ Pregled i pretraga čestica":
