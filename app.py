@@ -124,9 +124,11 @@ with col_ikona1:
     with st.popover("📋 Posjedovni Listovi"):
         st.markdown("### 📄 Posjedovni listovi (novi i stari) ")
         st.write("Preuzmite posjedovne listove:")
-        
-        # ČISTO ČITANJE: Tražimo sve dokumente iz baze koji u nazivu datoteke sadrže riječ 'posjedovni'
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE datoteka LIKE '%posjedovni%'")
+        cursor.execute("""
+            SELECT datoteka FROM povijest_dokumenata 
+            WHERE datoteka LIKE '%posjedovni%' OR datoteka LIKE '%PL%'
+        """)
+
         svi_opci = cursor.fetchall()
         
         if svi_opci:
@@ -176,7 +178,13 @@ with col_ikona3:
     with st.popover("📂 Dokumenti"):
         st.markdown("### 📁 Obiteljski dokumenti")
         
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 999999")
+        cursor.execute("""
+            SELECT datoteka FROM povijest_dokumenata 
+            WHERE vrsta_lista = 'Poslani dokument' 
+              AND datoteka NOT LIKE '%posjedovni%' 
+              AND datoteka NOT LIKE '%PL%'
+        """)
+
         svi_poslani_doc = cursor.fetchall()
         
         if svi_poslani_doc:
