@@ -8,8 +8,8 @@ import warnings
 st.set_page_config(page_title="Katastar Arhiva", layout="wide")
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# =========================================================================
-# 🔒 GLOBALNI ŠTIT: UKLANJA FORK ODMAH NA STARTU I PRILAGOĐAVA MOBITELE
+## =========================================================================
+# 🔒 GLOBALNI ŠTIT: POTPUNO ČIŠĆENJE IKONA I PRILAGODBA MOBITELE (BEZ BLOKIRANJA SIDEBARA)
 # =========================================================================
 st.markdown("""
     <style>
@@ -20,8 +20,8 @@ st.markdown("""
         visibility: hidden !important;
     }
     
-    /* 2. Osiguravamo da je gumb za otvaranje Sidebara na mobitelu UVIJEK vidljiv i prohodan */
-    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"] {
+    /* 2. Prisilno osiguravamo da je gumb za otvaranje Sidebara na mobitelu vidljiv i prohodan */
+    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"], .stSidebarCollapseButton {
         display: block !important;
         visibility: visible !important;
     }
@@ -43,7 +43,7 @@ st.markdown("""
         h2, h3, .stSubheader {
             font-size: 1.1rem !important;
         }
-        /* Podiže sadržaj na mobitelu prema gore */
+        /* Osiguravamo dobar razmak na vrhu mobilnog ekrana */
         .block-container {
             padding-top: 2rem !important;
         }
