@@ -55,7 +55,7 @@ cursor = conn.cursor()
 # =========================================================================
 # 🏛️ NAŠ VLASTITI UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
-popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Opći posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti od rodbine"]
+popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti od rodbine"]
 
 # Dijelimo cijeli ekran na dva dijela: Lijevi (Izbornik) i Desni (Sadržaj)
 glavni_col1, glavni_col2 = st.columns([1, 4])
@@ -124,15 +124,15 @@ with glavni_col2:
             st.dataframe(df, width='stretch', hide_index=True)
 
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
-    elif izbor == "📋 Opći posjedovni listovi":
-        st.title("📋 Opći Katastarski Posjedovni Listovi")
+    elif izbor == "📋 Posjedovni listovi":
+        st.title("📋 Katastarski Posjedovni Listovi")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
         svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pl:
             # POPRAVLJENO: Uzimamo indeks [0] da dobijemo čisto ime za padajući izbornik
             pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
-            odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista:", [""] + pl_imena)
+            odabrani_pl_ime = st.selectbox("📄 Odaberite posjedovni list:", [""] + pl_imena)
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
                 # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike
@@ -140,9 +140,11 @@ with glavni_col2:
                 st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
         else: st.info("Nema dokumenata u bazi.")
 
-    # --- 📜 EKRAN 3: MATIČNE KNJIGE ---
+    # --- 📜 EKRAN 3: MATIČNE KNJIGE ----
     elif izbor == "📜 Matične knjige":
         st.title("📜 Arhiv Matičnih Knjiga")
+        st.caption("🏛️ *Izvor dokumentacije: Državni arhiv u Zadru*")
+
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
         sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
@@ -163,8 +165,8 @@ with glavni_col2:
         else: st.info("Nema matičnih knjiga.")
 
     # --- 📂 EKRAN 4: DOKUMENTI OD RODBINE ---
-    elif izbor == "📂 Dokumenti od rodbine":
-        st.title("📂 Pregled Dokumenata Poslanih s Terena")
+    elif izbor == "📂 Dokumenti":
+        st.title("📂 Dokumentacija o Diobi")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
         svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
