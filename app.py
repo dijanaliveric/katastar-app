@@ -112,7 +112,7 @@ with glavni_col2:
             cursor.execute("SELECT vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka FROM povijest_dokumenata WHERE id_cestice = %s", (c_dict[odabrana_c],))
             for v, br, st_g, vl, p_n, dat in cursor.fetchall():
                 with st.expander(f"📄 {v} br. {br} ({st_g})"):
-                    st.write(f"👤 Korisnik: {vl} | 💬 {p_n}")
+                    st.write(f"👤 {vl} | 💬 {p_n}")
                     if dat and "|||" in dat:
                         ime, b64_kod = dat.split("|||", 1)
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
