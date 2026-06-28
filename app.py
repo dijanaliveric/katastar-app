@@ -122,10 +122,11 @@ def dohvati_mime_tip(ime_datoteke):
 
 with col_ikona1:
     with st.popover("📋 Posjedovni Listovi"):
-        st.markdown("### 📄 Opći katastarski dokumenti")
+        st.markdown("### 📄 Posjedovni listovi (novi i stari) ")
         st.write("Preuzmite posjedovne listove:")
         
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 888888")
+        # ČISTO ČITANJE: Tražimo sve dokumente iz baze koji u nazivu datoteke sadrže riječ 'posjedovni'
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE datoteka LIKE '%posjedovni%'")
         svi_opci = cursor.fetchall()
         
         if svi_opci:
@@ -137,11 +138,12 @@ with col_ikona1:
                         label=f"📥 {d_ime}",
                         data=f_bajtovi,
                         file_name=d_ime,
-                        mime=dsub_mime if (dsub_mime := dohvati_mime_tip(d_ime)) else "application/pdf",
+                        mime=d_mime if (d_mime := dohvati_mime_tip(d_ime)) else "application/pdf",
                         key=f"dl_opci_{d_ime}"
                     )
         else:
             st.caption("⚠️ Nema unesenih općih posjedovnih listova u bazi.")
+
 
 with col_ikona2:
     with st.popover("📜 Matične Knjige"):
