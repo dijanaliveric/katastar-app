@@ -12,20 +12,23 @@ st.set_page_config(
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-## =========================================================================
-# 🔒 GLOBALNI ŠTIT: POTPUNO ČIŠĆENJE IKONA I PRILAGODBA MOBITELE (BEZ BLOKIRANJA SIDEBARA)
+# =========================================================================
+# 🔒 GLOBALNI ŠTIT: UKLANJA FORK, ČUVA GUMB ZA PONOVNO OTVARANJE SIDEBARA
 # =========================================================================
 st.markdown("""
     <style>
-    /* 1. Kirurški precizno skriva isključivo Fork gumb, Deploy gumb i tri točkice na SVIM ekranima */
+    /* 1. Sakriva isključivo ikonu GitHuba (Fork), Deploy gumb i tri točkice u desnom kutu */
     .stDeployButton, [data-testid="stGithubIcon"], #MainMenu, 
-    header div div button:not([data-testid="stSidebarCollapseButton"]) {
+    header div div:has(button) div, 
+    header div[class^="st-emotion-cache"] div:has(button) {
         display: none !important;
         visibility: hidden !important;
     }
     
-    /* 2. Prisilno osiguravamo da je gumb za otvaranje Sidebara na mobitelu vidljiv i prohodan */
-    [data-testid="stSidebarCollapseButton"], button[aria-label="Open sidebar"], .stSidebarCollapseButton {
+    /* 2. Prisno osiguravamo da je gumb za vraćanje Sidebara na mobitelu (strelica lijevo) vidljiv i prohodan */
+    [data-testid="stSidebarCollapseButton"], 
+    button[aria-label="Open sidebar"], 
+    header button {
         display: block !important;
         visibility: visible !important;
     }
@@ -39,7 +42,6 @@ st.markdown("""
 
     /* 4. SPECIFIČNE POSTAVKE SAMO ZA MOBITEL (EKRANI MANJI OD 768 PIKSELA) */
     @media (max-width: 767px) {
-        /* Smanjuje naslove da se ne lome ružno na mobitelu */
         h1 {
             font-size: 1.4rem !important;
             line-height: 1.2 !important;
@@ -47,7 +49,6 @@ st.markdown("""
         h2, h3, .stSubheader {
             font-size: 1.1rem !important;
         }
-        /* Osiguravamo dobar razmak na vrhu mobilnog ekrana */
         .block-container {
             padding-top: 2rem !important;
         }
