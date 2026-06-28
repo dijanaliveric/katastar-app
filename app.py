@@ -58,37 +58,26 @@ except Exception:
 #st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
 # --- SAKRIVANJE GUMBA (FORK/DEPLOY), ZAŠTITA I AUTOMATSKO ZATVARANJE IZBORNIKA NA MOBITELU ---
+# --- MAKSIMALNO ČIŠĆENJE GORNJE TRAKE (UKLANJA FORK, DEPLOY I IZBORNIK) ---
 st.markdown("""
     <style>
-    /* Sakriva Fork ikonu, Deploy gumb i Streamlit izbornik s tri crtice u gornjem desnom kutu */
-    #MainMenu, .stDeployButton, footer, [data-testid="stStatusWidget"], [data-testid="stGithubIcon"] {
+    /* 1. Potpuno skriva cijelu gornju traku u kojoj se nalaze Fork, Deploy i tri crtice */
+    [data-testid="stHeader"] {
         display: none !important;
     }
-    /* Isključuje mogućnost dugog pritiska prsta na sliku na mobitelima */
+    
+    /* 2. Podiže sadržaj aplikacije malo prema gore jer smo ugasili traku, kako ne bi bilo praznog prostora */
+    .block-container {
+        padding-top: 2rem !important;
+    }
+    
+    /* 3. Isključuje označavanje i dugi pritisak prsta na slike na mobitelu */
     img {
         -webkit-touch-callout: none;
         -webkit-user-select: none;
         user-select: none;
-        pointer-events: none;
     }
     </style>
-    <script>
-    /* Isključuje desni klik miša na cijelom ekranu laptopa */
-    document.addEventListener('contextmenu', event => event.preventDefault());
-    
-    /* AUTOMATSKO ZATVARANJE SIDEBARA NAKON ODABIRA NA MOBITELU */
-    document.addEventListener('click', function(e) {
-        const unutarSidebara = e.target.closest('[data-testid="stSidebar"]') && e.target.closest('[role="radiogroup"]');
-        if (unutarSidebara) {
-            setTimeout(() => {
-                const gumbX = document.querySelector('[data-testid="stSidebarCollapseButton"]');
-                if (gumbX) {
-                    gumbX.click();
-                }
-            }, 300);
-        }
-    });
-    </script>
 """, unsafe_allow_html=True)
 
 # --- OPCIJA 1: PREGLED ČESTICA ---
@@ -139,7 +128,10 @@ if izbor == "🗺️ Pregled i pretraga čestica":
                 st.write(f"👤 Korisnik: {vl} | 💬 {p_n}")
                 if dat and "|||" in dat:
                     ime, b64_kod = dat.split("|||", 1)
-                    if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
+                    if ime.lower().endswith(('.jpg', '.jpeg', '.png')): 
+                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+
+                         st.image(base64.b64decode(b64_kod), use_container_width=True)
     else:
         import pandas as pd
         upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
@@ -161,6 +153,8 @@ elif izbor == "📋 Posjedovni listovi":
             indeks = pl_imena.index(odabrani_pl_ime)
             st.write("---")
             b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
+
+            st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
             st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
     else: 
         st.info("U bazi podataka trenutno nema unesenih posjedovnih listova.")
@@ -184,7 +178,10 @@ elif izbor == "📜 Matične knjige":
             indeks = mk_imena.index(odabir_osobe)
             st.write("---")
             b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
+           
+            st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
             st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+
     else: 
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
@@ -206,8 +203,10 @@ elif izbor == "📂 Dokumenti":
                        # --- POPRAVLJENO: Razlikujemo slike, PDF-ove, Excel i Word formate ---
             if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                 # Slike prikazujemo u punoj veličini
-                st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
-                
+               
+                    st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                    st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+ 
             elif naziv_datoteke.lower().endswith('.pdf'):
                 # PDF ugrađujemo na ekran
                 pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
