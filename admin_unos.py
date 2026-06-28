@@ -113,7 +113,7 @@ def prikazi_unos(conn, cursor, sva_p, p_dict):
                                 st.info("⚙️ Dokument je u PDF formatu. Pokrećem automatsko pretvaranje u slike visoke rezolucije...")
                                 
                                 # Pretvaramo PDF u popis slika u memoriji (300 DPI za kristalnu čitljivost)
-                                stranice_pdfa = convert_from_bytes(bajtovi_datoteke, dpi=300)
+                                stranice_pdfa = convert_from_bytes(bajtovi_datoteke, dpi=150)
                                 
                                 for indeks_stranice, stranica in enumerate(stranice_pdfa):
                                     import io
