@@ -160,13 +160,39 @@ elif izbor == "📂 Dokumenti od rodbine":
             st.write("---")
             naziv_datoteke, b64_sadrzaj = svi_pos[indeks].split("|||", 1)
             
+                       # --- POPRAVLJENO: Razlikujemo slike, PDF-ove, Excel i Word formate ---
             if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                # Slike prikazujemo u punoj veličini
                 st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                
             elif naziv_datoteke.lower().endswith('.pdf'):
+                # PDF ugrađujemo na ekran
                 pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
                 st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                
+            elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
+                # Za Excel i Word nudimo siguran gumb za download jer se ne mogu nacrtati kao slike
+                izvorni_bajtovi = base64.b64decode(b64_sadrzaj)
+                
+                # Određujemo točan MIME tip ovisno o tome je li Word ili Excel
+                if naziv_datoteke.lower().endswith(('.xlsx', '.xls')):
+                    m_tip = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ikona_gumba = "📊"
+                else:
+                    m_tip = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ikona_gumba = "📝"
+                
+                st.info(f"{ikona_gumba} Datoteka '{naziv_datoteke}' je uredski dokument. Kliknite ispod za preuzimanje i pregled:")
+                st.download_button(
+                    label=f"{ikona_gumba} Preuzmi: {naziv_datoteke}",
+                    data=izvorni_bajtovi,
+                    file_name=naziv_datoteke,
+                    mime=m_tip,
+                    key=f"dl_rodbina_{naziv_datoteke}"
+                )
             else:
                 st.warning(f"Format datoteke '{naziv_datoteke}' nije podržan za izravan pregled.")
+
     else: 
         st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
 
