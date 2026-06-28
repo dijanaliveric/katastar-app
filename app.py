@@ -104,42 +104,59 @@ if izbor == "🗺️ Pregled i pretraga čestica":
         st.dataframe(df, width='stretch', hide_index=True)
 
 # --- OPCIJA 2: VELIKI PREGLED POSJEDOVNIH LISTOVA PREKO CIJELOG EKRANA ---
-elif izbor == "📋 Posjedovni listovi":
-    st.title("📋 Katastarski Posjedovni Listovi")
+elif izbor == "📋 Opći posjedovni listovi":
+    st.title("📋 Opći Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-    svi_pl = [r[0] for r in cursor.fetchall() if r[0] and "|||" in r[0]]
+    svi_pl = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    
     if svi_pl:
         pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
-        odabrani_pl = st.selectbox("📄 Odaberite stranicu posjedovnog lista za pregled:", pl_imena)
-        indeks = pl_imena.index(odabrani_pl)
+        odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista za pregled:", pl_imena)
+        indeks = pl_imena.index(odabrani_pl_ime)
+        
         st.write("---")
-        st.image(base64.b64decode(svi_pl[indeks].split("|||", 1)[1]), use_container_width=True)
-    else: st.info("Nema unesenih dokumenata.")
+        b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
+        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+    else: 
+        st.info("U bazi podataka trenutno nema unesenih općih posjedovnih listova.")
 
 # --- OPCIJA 3: VELIKI PREGLED MATIČNIH KNJIGA PREKO CIJELOG EKRANA ---
 elif izbor == "📜 Matične knjige":
-    st.title("📜 Matične Knjige (Državni Arhiv Zadar)")
+    st.title("📜 Arhiv Matičnih Knjiga (Državni Arhiv Zadar)")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-    sve_mk = [r[0] for r in cursor.fetchall() if r[0] and "|||" in r[0]]
+    sve_mk = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    
     if sve_mk:
-        mk_imena = [(f.split("|||", 1)[0].split('.')[0]).upper() + " MLINAR" for f in sve_mk]
-        odabir_osobe = st.selectbox("👤 Odaberite pretka za pregled zapisa:", mk_imena)
+        mk_imena = []
+        for f in sve_mk:
+            ime_datoteke = f.split("|||", 1)[0]
+            čisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
+            mk_imena.append(f"Arhiv: {čisto_ime.upper()}")
+            
+        odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", mk_imena)
         indeks = mk_imena.index(odabir_osobe)
+        
         st.write("---")
-        st.image(base64.b64decode(sve_mk[indeks].split("|||", 1)[1]), use_container_width=True)
-    else: st.info("Nema unesenih matičnih knjiga.")
+        b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
+        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+    else: 
+        st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
 # --- OPCIJA 4: PREGLED DOKUMENATA OD RODBINE PREKO CIJELOG EKRANA ---
-elif izbor == "📂 Dokumenti":
-    st.title("📂 Pregled Dokumenata")
+elif izbor == "📂 Dokumenti od rodbine":
+    st.title("📂 Pregled Dokumenata Poslanih s Terena")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-    svi_pos = [r[0] for r in cursor.fetchall() if r[0] and "|||" in r[0]]
+    svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    
     if svi_pos:
         p_imena = [f.split("|||", 1)[0] for f in svi_pos]
         odabir_doc = st.selectbox("Odaberite dokument:", p_imena)
         indeks = p_imena.index(odabir_doc)
+        
         st.write("---")
-        st.image(base64.b64decode(svi_pos[indeks].split("|||", 1)[1]), use_container_width=True)
-    else: st.info("Nema dokumenata od rodbine.")
+        b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
+        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+    else: 
+        st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
 
 conn.close()
