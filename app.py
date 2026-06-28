@@ -104,7 +104,7 @@ if izbor == "🗺️ Pregled i pretraga čestica":
         st.dataframe(df, width='stretch', hide_index=True)
 
 # --- OPCIJA 2: VELIKI PREGLED POSJEDOVNIH LISTOVA PREKO CIJELOG EKRANA ---
-elif izbor == "📋 Opći posjedovni listovi":
+elif izbor == "📋 Posjedovni listovi":
     st.title("📋 Opći Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
     svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
@@ -124,7 +124,7 @@ elif izbor == "📋 Opći posjedovni listovi":
 
 # --- OPCIJA 3: VELIKI PREGLED MATIČNIH KNJIGA PREKO CIJELOG EKRANA ---
 elif izbor == "📜 Matične knjige":
-    st.title("📜 Arhiv Matičnih Knjiga (Državni Arhiv Zadar)")
+    st.title("📜 Državni Arhiv Zadar)")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
     sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
     
@@ -147,21 +147,30 @@ elif izbor == "📜 Matične knjige":
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
 # --- OPCIJA 4: PREGLED DOKUMENATA OD RODBINE PREKO CIJELOG EKRANA ---
-elif izbor == "📂 Dokumenti od rodbine":
-    st.title("📂 Pregled Dokumenata Poslanih s Terena")
+elif izbor == "📂 Dokumenti":
+    st.title("📂 Pregled Obiteljskih Dokumenata")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-    svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+    svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
     
     if svi_pos:
         p_imena = [f.split("|||", 1)[0] for f in svi_pos]
-        # POPRAVLJENO: Početno prazno polje na vrhu selektora
         odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
         
         if odabir_doc != "":
             indeks = p_imena.index(odabir_doc)
             st.write("---")
-            b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
-            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+            naziv_datoteke, b64_sadrzaj = svi_pos[indeks].split("|||", 1)
+            
+            # --- POPRAVLJENO: Razlikujemo slike i PDF-ove kako ne bi bilo PIL greške ---
+            if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                # Ako je slika, crtamo je zaštićenu preko cijelog zaslona
+                st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+            elif naziv_datoteke.lower().endswith('.pdf'):
+                # Ako je stari ili novi PDF, ugrađujemo ga u veliki prozor sa skrivenom gornjom trakom alata (#toolbar=0)
+                pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
+                st.markdown(pdf_prikaz, unsafe_allow_html=True)
+            else:
+                st.warning(f"Format datoteke '{naziv_datoteke}' nije podržan za izravan pregled.")
     else: 
         st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
 
