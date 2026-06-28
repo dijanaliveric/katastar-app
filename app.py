@@ -108,7 +108,7 @@ st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
 
 
 # --- 4. FIKSNI GUMBI ZA OPĆE DOKUMENTE I MATIČNE KNJIGE IZ BAZE (UNIVERZALNI MIME) ---
-col_ikona1, col_ikona2, col_ikona3, _ = st.columns()
+col_ikona1, col_ikona2, col_ikona3, _ = st.columns(4)
 
 # Pomoćna funkcija za automatsko određivanje ispravnog MIME tipa datoteke
 def dohvati_mime_tip(ime_datoteke):
