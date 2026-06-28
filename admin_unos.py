@@ -99,38 +99,65 @@ def prikazi_unos(conn, cursor, sva_p, p_dict):
                     else:
                         try:
                             import base64
-                            # 1. Čitamo datoteku i pretvaramo je u običan tekstualni niz
-                            bajtovi = ucitana_datoteka.read()
-                            tekstualni_b64 = base64.b64encode(bajtovi).decode('utf-8')
+                            import io
+                            # SAKRIVENI IMPORT: Pokreće se TEK kad kliknete na gumb, što sprječava blokiranje stranice!
+                            from pdf2image import convert_from_bytes
                             
-                            # 2. Spajamo naziv datoteke s njenim sadržajem u jedan tekst
-                            # npr: "slika.jpg|||OVDJE_IDE_CILI_TEKST_SLIKE"
-                            kodirani_zapis = f"{ucitana_datoteka.name}|||{tekstualni_b64}"
                             
-                            pravi_id_cestice = int(c_doc_dict[c_odabir])
+                            naziv_datoteke = ucitana_datoteka.name
+                            bajtovi_datoteke = ucitana_datoteka.read()
+                            pravi_id_cestice = int(c_doc_dict[c_odabir]) if c_odabir in c_doc_dict else None
                             
-                            # 3. Upisujemo SVE u SQL tablicu odjednom (Preko provjerenog psycopg2)
-                            cursor.execute(
-                                """
-                                INSERT INTO povijest_dokumenata 
-                                (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
-                                VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                """,
-                                (
-                                    pravi_id_cestice,
-                                    v_lista,
-                                    br_lista,
-                                    starost,
-                                    vlasnik,
-                                    p_nap,
-                                    kodirani_zapis,  # <-- Ovdje sada spremamo cijelu datoteku kao tekst!
-                                ),
-                            )
-                            conn.commit()
-                            st.success(f"✅ Uspješno spremljen dokument u bazu za česticu {c_odabir}!")
-                            st.rerun()
-                            
+                            # --- AKO JE KORISNIK UČITAO PDF, PRETVARAMO GA U SLIKE ---
+                            if naziv_datoteke.lower().endswith('.pdf'):
+                                st.info("⚙️ Dokument je u PDF formatu. Pokrećem automatsko pretvaranje u slike visoke rezolucije...")
+                                
+                                # Pretvaramo PDF u popis slika u memoriji (300 DPI za kristalnu čitljivost)
+                                stranice_pdfa = convert_from_bytes(bajtovi_datoteke, dpi=300)
+                                
+                                for indeks_stranice, stranica in enumerate(stranice_pdfa):
+                                    import io
+                                    # Spremamo svaku stranicu u privremeni memorijski spremnik kao JPEG
+                                    izlazni_spremnik = io.BytesIO()
+                                    stranica.save(izlazni_spremnik, format="JPEG", quality=90)
+                                    bajtovi_slike = izlazni_spremnik.getvalue()
+                                    
+                                    # Sastavljamo novi naziv (npr. posjedovni_list_1_stranica_1.jpg)
+                                    novo_ime_slike = f"{naziv_datoteke.rsplit('.', 1)[0]}_stranica_{indeks_stranice + 1}.jpg"
+                                   
+                                    tekstualni_b64 = base64.b64encode(bajtovi_slike).decode('utf-8')
+                                    kodirani_zapis = f"{novo_ime_slike}|||{tekstualni_b64}"
+                                    
+                                    # Upisujemo svaku stranicu kao zaseban red u SQL bazu podataka
+                                    cursor.execute(
+                                        """
+                                        INSERT INTO povijest_dokumenata 
+                                        (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
+                                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                        """,
+                                        (pravi_id_cestice, v_lista, f"{br_lista} (Str. {indeks_stranice + 1})", starost, vlasnik, p_nap, kodirani_zapis),
+                                    )
+                                conn.commit()
+                                st.success(f"✅ Uspješno rastavljeno u {len(stranice_pdfa)} slika i spremljeno u online arhivu!")
+                                st.rerun()
+                                
+                            # --- AKO JE KORISNIK UČITAO OBIČNU SLIKU (JPG, PNG) ---
+                            else:
+                                tekstualni_b64 = base64.b64encode(bajtovi_datoteke).decode('utf-8')
+                                kodirani_zapis = f"{naziv_datoteke}|||{tekstualni_b64}"
+                                
+                                cursor.execute(
+                                    """
+                                    INSERT INTO povijest_dokumenata 
+                                    (id_cestice, vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka) 
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    """,
+                                    (pravi_id_cestice, v_lista, br_lista, starost, vlasnik, p_nap, kodirani_zapis),
+                                )
+                                conn.commit()
+                                st.success(f"✅ Uspješno spremljena slika u bazu podataka!")
+                                st.rerun()
+                                
                         except Exception as e:
-                            if conn:
-                                conn.rollback()
-                            st.error(f"❌ Greška prilikom spremanja u SQL bazu: {e}")
+                            if conn: conn.rollback()
+                            st.error(f"❌ Greška prilikom obrade i spremanja dokumenta: {e}")
