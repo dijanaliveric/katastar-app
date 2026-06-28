@@ -107,16 +107,18 @@ if izbor == "🗺️ Pregled i pretraga čestica":
 elif izbor == "📋 Opći posjedovni listovi":
     st.title("📋 Opći Katastarski Posjedovni Listovi")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-    svi_pl = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
     
     if svi_pl:
         pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
-        odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista za pregled:", pl_imena)
-        indeks = pl_imena.index(odabrani_pl_ime)
+        # POPRAVLJENO: Početno prazno polje na vrhu selektora
+        odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista za pregled:", [""] + pl_imena)
         
-        st.write("---")
-        b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
-        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+        if odabrani_pl_ime != "":
+            indeks = pl_imena.index(odabrani_pl_ime)
+            st.write("---")
+            b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
+            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
     else: 
         st.info("U bazi podataka trenutno nema unesenih općih posjedovnih listova.")
 
@@ -124,21 +126,23 @@ elif izbor == "📋 Opći posjedovni listovi":
 elif izbor == "📜 Matične knjige":
     st.title("📜 Arhiv Matičnih Knjiga (Državni Arhiv Zadar)")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-    sve_mk = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
     
     if sve_mk:
         mk_imena = []
         for f in sve_mk:
             ime_datoteke = f.split("|||", 1)[0]
-            čisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
-            mk_imena.append(f"Arhiv: {čisto_ime.upper()}")
+            cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
+            mk_imena.append(f"Arhiv: {cisto_ime.upper()}")
             
-        odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", mk_imena)
-        indeks = mk_imena.index(odabir_osobe)
+        # POPRAVLJENO: Početno prazno polje na vrhu selektora
+        odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
         
-        st.write("---")
-        b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
-        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+        if odabir_osobe != "":
+            indeks = mk_imena.index(odabir_osobe)
+            st.write("---")
+            b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
+            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
     else: 
         st.info("U bazi podataka trenutno nema unesenih matičnih knjiga.")
 
@@ -146,16 +150,18 @@ elif izbor == "📜 Matične knjige":
 elif izbor == "📂 Dokumenti od rodbine":
     st.title("📂 Pregled Dokumenata Poslanih s Terena")
     cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-    svi_pos = [r[0] for r in cursor.fetchall() if r and r[0] and "|||" in r[0]]
+    svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
     
     if svi_pos:
         p_imena = [f.split("|||", 1)[0] for f in svi_pos]
-        odabir_doc = st.selectbox("Odaberite dokument:", p_imena)
-        indeks = p_imena.index(odabir_doc)
+        # POPRAVLJENO: Početno prazno polje na vrhu selektora
+        odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
         
-        st.write("---")
-        b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
-        st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+        if odabir_doc != "":
+            indeks = p_imena.index(odabir_doc)
+            st.write("---")
+            b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
+            st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
     else: 
         st.info("Rodbina još nije poslala nijedan dokument preko gornjeg uploadera.")
 
