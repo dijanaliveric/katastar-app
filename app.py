@@ -47,6 +47,49 @@ izbor = st.sidebar.radio(
     "Odaberite što želite gledati:",
     ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
 )
+cursor = conn.cursor()
+
+# Osiguravamo tablice i polja u bazi podataka na internetu
+try:
+    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS katastarska_opcina TEXT;")
+    conn.commit()
+except Exception:
+    if conn: conn.rollback()
+st.title("🗺️ Obiteljska Arhiva Zemljišta i Čestica")
+
+# --- SAKRIVANJE GUMBA (FORK/DEPLOY), ZAŠTITA I AUTOMATSKO ZATVARANJE IZBORNIKA NA MOBITELU ---
+st.markdown("""
+    <style>
+    /* Sakriva Fork ikonu, Deploy gumb i Streamlit izbornik s tri crtice u gornjem desnom kutu */
+    #MainMenu, .stDeployButton, footer, [data-testid="stStatusWidget"], [data-testid="stGithubIcon"] {
+        display: none !important;
+    }
+    /* Isključuje mogućnost dugog pritiska prsta na sliku na mobitelima */
+    img {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        pointer-events: none;
+    }
+    </style>
+    <script>
+    /* Isključuje desni klik miša na cijelom ekranu laptopa */
+    document.addEventListener('contextmenu', event => event.preventDefault());
+    
+    /* AUTOMATSKO ZATVARANJE SIDEBARA NAKON ODABIRA NA MOBITELU */
+    document.addEventListener('click', function(e) {
+        const unutarSidebara = e.target.closest('[data-testid="stSidebar"]') && e.target.closest('[role="radiogroup"]');
+        if (unutarSidebara) {
+            setTimeout(() => {
+                const gumbX = document.querySelector('[data-testid="stSidebarCollapseButton"]');
+                if (gumbX) {
+                    gumbX.click();
+                }
+            }, 300);
+        }
+    });
+    </script>
+""", unsafe_allow_html=True)
 
 # --- OPCIJA 1: PREGLED ČESTICA ---
 if izbor == "🗺️ Pregled i pretraga čestica":
