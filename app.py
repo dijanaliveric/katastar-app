@@ -123,19 +123,20 @@ with glavni_col2:
             df = pd.read_sql_query(upit, conn)
             st.dataframe(df, width='stretch', hide_index=True)
 
-    # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
+        # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
     elif izbor == "📋 Opći posjedovni listovi":
         st.title("📋 Opći Katastarski Posjedovni Listovi")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
-        #svi_pl = [r for r in cursor.fetchall() if r and "|||" in r]
         svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pl:
-            pl_imena = [f.split("|||", 1) for f in svi_pl]
+            # POPRAVLJENO: Uzimamo indeks [0] da dobijemo čisto ime za padajući izbornik
+            pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
             odabrani_pl_ime = st.selectbox("📄 Odaberite stranicu posjedovnog lista:", [""] + pl_imena)
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
-                b64_sadrzaj = svi_pl[indeks].split("|||", 1)
+                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike
+                b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
                 st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
         else: st.info("Nema dokumenata u bazi.")
 
@@ -143,19 +144,21 @@ with glavni_col2:
     elif izbor == "📜 Matične knjige":
         st.title("📜 Arhiv Matičnih Knjiga")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-        #sve_mk = [r for r in cursor.fetchall() if r and "|||" in r]
         sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if sve_mk:
             mk_imena = []
             for f in sve_mk:
-                ime_datoteke = f.split("|||", 1)
-                cisto_ime = ime_datoteke.rsplit('.', 1) if '.' in ime_datoteke else ime_datoteke
+                # POPRAVLJENO: Uzimamo indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
+                ime_datoteke = f.split("|||", 1)[0]
+                cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
                 mk_imena.append(f"Arhiv: {cisto_ime.upper()} MLINAR")
+                
             odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
             if odabir_osobe != "":
                 indeks = mk_imena.index(odabir_osobe)
-                b64_sadrzaj = sve_mk[indeks].split("|||", 1)
+                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike predka
+                b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
                 st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
         else: st.info("Nema matičnih knjiga.")
 
@@ -163,15 +166,18 @@ with glavni_col2:
     elif izbor == "📂 Dokumenti od rodbine":
         st.title("📂 Pregled Dokumenata Poslanih s Terena")
         cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-        #svi_pos = [r for r in cursor.fetchall() if r and "|||" in r]
         svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pos:
-            p_imena = [f.split("|||", 1) for f in svi_pos]
+            # POPRAVLJENO: Uzimamo indeks [0] za čisto ime datoteke na popisu rodbine
+            p_imena = [f.split("|||", 1)[0] for f in svi_pos]
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
             if odabir_doc != "":
                 indeks = p_imena.index(odabir_doc)
-                naziv_datoteke, b64_sadrzaj = svi_pos[indeks].split("|||", 1)
+                # POPRAVLJENO: Točno raspakiravamo naziv [0] i Base64 kod [1] iz baze
+                naziv_datoteke = svi_pos[indeks].split("|||", 1)[0]
+                b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
+                
                 if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                     st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
                 elif naziv_datoteke.lower().endswith('.pdf'):
@@ -182,3 +188,4 @@ with glavni_col2:
         else: st.info("Nema dokumenata.")
 
 conn.close()
+
