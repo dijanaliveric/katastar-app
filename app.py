@@ -73,7 +73,7 @@ with glavni_col2:
     if izbor == "🗺️ Pregled i pretraga čestica":
         st.title("🗺️ Obiteljska Arhiva Katastra")
         if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
-        up_doc = st.file_uploader("Učitaj novi dokument s terena:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
+        up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
         if up_doc is not None:
             try:
                 b64 = base64.b64encode(up_doc.read()).decode('utf-8')
