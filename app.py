@@ -122,69 +122,45 @@ def dohvati_mime_tip(ime_datoteke):
 
 with col_ikona1:
     with st.popover("📋 Posjedovni Listovi"):
-        st.markdown("### 📄 Posjedovni listovi (novi i stari) ")
-        st.write("Preuzmite posjedovne listove:")
-        cursor.execute("""
-            SELECT datoteka FROM povijest_dokumenata 
-            WHERE datoteka LIKE '%posjedovni%' OR datoteka LIKE '%PL%'
-        """)
-
+        st.markdown("### 📄 Opći katastarski dokumenti")
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
         svi_opci = cursor.fetchall()
         
         if svi_opci:
             for (sadrzaj,) in svi_opci:
                 if sadrzaj and "|||" in sadrzaj:
                     d_ime, b64_kod = sadrzaj.split("|||", 1)
-                    f_bajtovi = base64.b64decode(b64_kod)
-                    st.download_button(
-                        label=f"📥 {d_ime}",
-                        data=f_bajtovi,
-                        file_name=d_ime,
-                        mime=d_mime if (d_mime := dohvati_mime_tip(d_ime)) else "application/pdf",
-                        key=f"dl_opci_{d_ime}"
-                    )
+                    st.caption(f"🔹 **Pregled: {d_ime}**")
+                    # Izravno ugrađujemo PDF u popover prozor bez gumba za download
+                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_kod}" width="100%" height="500" type="application/pdf"></iframe>'
+                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                    st.write("---")
         else:
             st.caption("⚠️ Nema unesenih općih posjedovnih listova u bazi.")
-
 
 with col_ikona2:
     with st.popover("📜 Matične Knjige"):
         st.markdown("### 🏛️ Matične knjige - državni arhiv")
-        st.write("Preuzmite obiteljsku arhivu:")
-        
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id_cestice = 777777")
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
         sve_mk = cursor.fetchall()
         
         if sve_mk:
             for (sadrzaj,) in sve_mk:
                 if sadrzaj and "|||" in sadrzaj:
                     d_ime, b64_kod = sadrzaj.split("|||", 1)
-                    f_bajtovi = base64.b64decode(b64_kod)
-                    
-                    # Čistimo naziv za ljepši prikaz na gumbu (npr. "Illia.png" postaje "Illia")
-                    prikaz_ime = d_ime.split('.')[0] if '.' in d_ime else d_ime
-                    
-                    st.download_button(
-                        label=f"👶 {prikaz_ime.upper()} MLINAR",
-                        data=f_bajtovi,
-                        file_name=d_ime,
-                        mime=dohvati_mime_tip(d_ime),
-                        key=f"dl_mk_{d_ime}"
-                    )
+                    prikaz_ime = d_ime.split('.')[0].upper() if '.' in d_ime else d_ime
+                    st.markdown(f"👶 **{prikaz_ime} MLINAR**")
+                    # Izravno crtamo sliku pretka na ekran iz bajtova
+                    izvorni_bajtovi = base64.b64decode(b64_kod)
+                    st.image(izvorni_bajtovi, use_container_width="always")
+                    st.write("---")
         else:
             st.caption("⚠️ Nema unesenih matičnih knjiga u bazi.")
 
 with col_ikona3:
     with st.popover("📂 Dokumenti"):
-        st.markdown("### 📁 Obiteljski dokumenti")
-        
-        cursor.execute("""
-            SELECT datoteka FROM povijest_dokumenata 
-            WHERE vrsta_lista = 'Poslani dokument' 
-              AND datoteka NOT LIKE '%posjedovni%' 
-              AND datoteka NOT LIKE '%PL%'
-        """)
-
+        st.markdown("### 📁 Obiteljski Dokumenti")
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
         svi_poslani_doc = cursor.fetchall()
         
         if svi_poslani_doc:
@@ -192,27 +168,18 @@ with col_ikona3:
                 if sadrzaj_datoteke and "|||" in sadrzaj_datoteke:
                     try:
                         d_ime, b64_kod = sadrzaj_datoteke.split("|||", 1)
-                        f_bajtovi = base64.b64decode(b64_kod)
+                        st.caption(f"📄 **{d_ime}**")
                         
-                        st.download_button(
-                            label=f"🔹 Preuzmi: {d_ime}",
-                            data=f_bajtovi,
-                            file_name=d_ime,
-                            mime=dohvati_mime_tip(d_ime),
-                            key=f"dl_g_{d_ime}"
-                        )
+                        if d_ime.lower().endswith(('.jpg', '.jpeg', '.png')):
+                            izvorni_bajtovi = base64.b64decode(b64_kod)
+                            st.image(izvorni_bajtovi, use_container_width="always")
+                        elif d_ime.lower().endswith('.pdf'):
+                            pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_kod}" width="100%" height="500" type="application/pdf"></iframe>'
+                            st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                        st.write("---")
                     except Exception: pass
         else:
             st.info("Nema učitanih dokumenata. Iskoristite uploader na vrhu.")
-
-
-# Osiguravamo da polje katastarska_opcina postoji u bazi
-#try:
-#    cursor.execute("ALTER TABLE cestice ADD COLUMN katastarska_opcina TEXT;")
-#    conn.commit()
-#except sqlite3.OperationalError:
-#    pass
-
 # --- POPRAVLJENO ZA SUPABASE (PostgreSQL) ---
 try:
     # SQL naredba koja u Postgresu dodaje stupac ako on vec ne postoji
