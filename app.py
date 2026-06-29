@@ -170,8 +170,17 @@ with glavni_col2:
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
                 # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike
+                              # TOČNA ZAMJENA: Razdvajamo ime i Base64 sadržaj
+                naziv_datoteke = svi_pl[indeks].split("|||", 1)[0]
                 b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
-                st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                
+                st.write("---")
+                if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                elif naziv_datoteke.lower().endswith('.pdf'):
+                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
+                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
+
         else: st.info("Nema dokumenata u bazi.")
 
     # --- 📜 EKRAN 3: MATIČNE KNJIGE ----
