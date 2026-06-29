@@ -104,7 +104,7 @@ with glavni_col2:
             c1.info(f"**📑 K.O.:** {ko}\n\n**🔢 ZK Uložak:** {zk}")
             c2.info(f"**🌿 Oznaka:** {oz}\n\n**🗺️ Naziv:** {nz}")
             c3.success(f"**📐 Površina:**\n\n### {pov} m²")
-            st.markdown(f"**🏷️ Kategorija:** `{sif if sif else 'Bez šifre'}`")
+           # st.markdown(f"**🏷️ Kategorija:** `{sif if sif else 'Bez šifre'}`")
             if nap: st.info(f"📝 Napomena: {nap}")
             
             st.write("---")
@@ -121,7 +121,7 @@ with glavni_col2:
             
             import pandas as pd
             # 1. Početni osnovni upit koji povlači sve čestice iz baze podataka
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.naziv_zemljista, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
             parametri = None
             
             # 2. TOČNO OVO: Ako NIJE odabrano "Sva područja", dodajemo vaš WHERE filter po ID-u područja
@@ -132,6 +132,12 @@ with glavni_col2:
             # 3. Pandas sam izvršava upit (s parametrom ili bez njega, ovisno o odabiru)
             df = pd.read_sql_query(upit, conn, params=parametri)
             st.dataframe(df, width='stretch', hide_index=True)
+            
+            ukupna_povrsina = pd.to_numeric(df['Površina (m²)'], errors='coerce').fillna(0).sum()
+            st.write("")
+            col_prazan1, col_prazan2, col_Desno = st.columns(3)
+            with col_Desno:
+                st.metric(label=f"📐 Ukupna površina ({odabrano_p}):", value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²")
 
             
 
