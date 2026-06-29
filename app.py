@@ -124,6 +124,7 @@ with glavni_col2:
             #st.dataframe(df, width='stretch', hide_index=True)
                     
             # NOVO: Čitamo iz našeg novog, pametnog SQL pogleda koji sam skriva lažne čestice
+
             upit = "SELECT broj_cestice, zk_ulozak, katastarska_opcina, naziv_podrucja, povrsina FROM pregled_cistih_cestica"
             df = pd.read_sql_query(upit, conn)
             st.dataframe(df, width='stretch', hide_index=True)
