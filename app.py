@@ -91,8 +91,12 @@ with glavni_col2:
         p_dict = {naziv: id for id, naziv in cursor.fetchall()}
         with col_f1: odabrano_p = st.selectbox("Odaberi područje:", ["Sva područja"] + list(p_dict.keys()))
 
-        if odabrano_p == "Sva područja": cursor.execute("SELECT id, broj_cestice FROM cestice")
-        else: cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s", (p_dict[odabrano_p],))
+                # NOVO STANJE: Sakrivamo tehničke zapise iz padajućeg izbornika čestica
+        if odabrano_p == "Sva područja": 
+            cursor.execute("SELECT id, broj_cestice FROM cestice WHERE broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')")
+        else: 
+            cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s AND broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')", (p_dict[odabrano_p],))
+
         c_dict = {broj: id for id, broj in cursor.fetchall()}
         with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()))
 
