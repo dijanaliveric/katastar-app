@@ -3,6 +3,7 @@ import psycopg2
 import streamlit as st
 import base64
 import warnings
+import pandas as pd
 
 # 1. POSTAVKE STRANICE
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
@@ -119,27 +120,40 @@ with glavni_col2:
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
         else:
             
-            import pandas as pd
-            # 1. Početni osnovni upit koji povlači sve čestice iz baze podataka
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.naziv_zemljista, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+                  # 3. ELSE: PRIKAZUJEMO VELIKU TABLICU KOJA PRATI ODABRANO PODRUČJE
+        
+            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, c.naziv_zemljista, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
             parametri = None
             
-            # 2. TOČNO OVO: Ako NIJE odabrano "Sva područja", dodajemo vaš WHERE filter po ID-u područja
             if odabrano_p != "Sva područja":
                 upit += " WHERE c.id_podrucja = %s"
                 parametri = [p_dict[odabrano_p]]
                 
-            # 3. Pandas sam izvršava upit (s parametrom ili bez njega, ovisno o odabiru)
             df = pd.read_sql_query(upit, conn, params=parametri)
+            
+            # Preimenovanje stupaca za ljepši prikaz rodbini
+            preimenovani_stupci = {
+                "broj_cestice": "Broj čestice", 
+                "zk_ulozak": "Broj ZK uloška", 
+                "katastarska_opcina": "Katastarska općina", 
+                "naziv_zemljista": "Naziv zemljišta",
+                "naziv_podrucja": "Područje", 
+                "povrsina": "Površina (m²)"
+            }
+            df = df.rename(columns=preimenovani_stupci)
+            
+            # Prikazujemo tablicu preko cijele širine ekrana laptopa
             st.dataframe(df, width='stretch', hide_index=True)
             
+            # RAČUNANJE UKUPNE POVRŠINE (SADA SIGURNO UNUTAR ISPRAVNOG RAZMAKA)
             ukupna_povrsina = pd.to_numeric(df['Površina (m²)'], errors='coerce').fillna(0).sum()
             st.write("")
             col_prazan1, col_prazan2, col_Desno = st.columns(3)
             with col_Desno:
-                st.metric(label=f"📐 Ukupna površina ({odabrano_p}):", value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²")
-
-            
+                st.metric(
+                    label=f"📐 Ukupna površina ({odabrano_p}):", 
+                    value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²"
+                )
 
 
 
