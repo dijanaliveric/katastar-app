@@ -117,19 +117,23 @@ with glavni_col2:
                         ime, b64_kod = dat.split("|||", 1)
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
-        
+        else:
+            
             import pandas as pd
-            # 1. Ako je odabrano Sva područja, povlačimo sve bez WHERE filtera
-            if odabrano_p == "Sva područja":
-                upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
-                df = pd.read_sql_query(upit, conn)
-            # 2. Ako je odabrano pravo područje, dodajemo točno vaš WHERE uvjet s params
-            else:
-                upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id_podrucja = %s"
-                df = pd.read_sql_query(upit, conn, params=[p_dict[odabrano_p]])
+            # 1. Početni osnovni upit koji povlači sve čestice iz baze podataka
+            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+            parametri = None
+            
+            # 2. TOČNO OVO: Ako NIJE odabrano "Sva područja", dodajemo vaš WHERE filter po ID-u područja
+            if odabrano_p != "Sva područja":
+                upit += " WHERE c.id_podrucja = %s"
+                parametri = [p_dict[odabrano_p]]
                 
+            # 3. Pandas sam izvršava upit (s parametrom ili bez njega, ovisno o odabiru)
+            df = pd.read_sql_query(upit, conn, params=parametri)
             st.dataframe(df, width='stretch', hide_index=True)
 
+            
 
 
 
