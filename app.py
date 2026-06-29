@@ -117,16 +117,19 @@ with glavni_col2:
                         ime, b64_kod = dat.split("|||", 1)
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
-        else:
+        
             import pandas as pd
-            #upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
-            #df = pd.read_sql_query(upit, conn)
-            #st.dataframe(df, width='stretch', hide_index=True)
-                    
-            # NOVO: Čitamo iz našeg novog, pametnog SQL pogleda koji sam skriva lažne čestice
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id_podrucja = %s"
-            df = pd.read_sql_query(upit, conn, params=[p_dict[odabrano_p]])
+            # 1. Ako je odabrano Sva područja, povlačimo sve bez WHERE filtera
+            if odabrano_p == "Sva područja":
+                upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+                df = pd.read_sql_query(upit, conn)
+            # 2. Ako je odabrano pravo područje, dodajemo točno vaš WHERE uvjet s params
+            else:
+                upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id_podrucja = %s"
+                df = pd.read_sql_query(upit, conn, params=[p_dict[odabrano_p]])
+                
             st.dataframe(df, width='stretch', hide_index=True)
+
 
 
 
