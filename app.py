@@ -119,9 +119,15 @@ with glavni_col2:
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
         else:
             import pandas as pd
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+            #upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+            #df = pd.read_sql_query(upit, conn)
+            #st.dataframe(df, width='stretch', hide_index=True)
+                    
+            # NOVO: Čitamo iz našeg novog, pametnog SQL pogleda koji sam skriva lažne čestice
+            upit = "SELECT broj_cestice, zk_ulozak, katastarska_opcina, naziv_podrucja, povrsina FROM pregled_cistih_cestica"
             df = pd.read_sql_query(upit, conn)
             st.dataframe(df, width='stretch', hide_index=True)
+
 
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
     elif izbor == "📋 Posjedovni listovi":
