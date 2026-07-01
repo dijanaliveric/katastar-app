@@ -54,7 +54,7 @@ cursor = conn.cursor()
 
 
 # =========================================================================
-# 🏛️ NAŠ VLASTITI UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
+# 🏛️ UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
 popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
 
@@ -65,6 +65,9 @@ with glavni_col1:
     st.markdown("### 🧭 Navigacija")
     izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
     st.write("---")
+    st.markdown("### 🔗 Provjeri česticu na službenom katastru:")
+    st.markdown("[📍 Prikaži mapu i granice posjeda](https://oss.uredjenazemlja.hr/map)")
+
 
 # =========================================================================
 # 🚀 DESNI DIO: LOGIKA PRIKAZA EKRANA OVISNO O ODABIRU
@@ -74,13 +77,14 @@ with glavni_col2:
     if izbor == "🗺️ Pregled i pretraga čestica":
         st.title("🗺️ Obiteljska Arhiva Katastra")
         if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
-        up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf"], key=f"up_{st.session_state['uploader_kljuc']}")
+        up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf", "xlsx"], key=f"up_{st.session_state['uploader_kljuc']}")
+
         if up_doc is not None:
             try:
                 b64 = base64.b64encode(up_doc.read()).decode('utf-8')
                 cursor.execute("INSERT INTO povijest_dokumenata (id_cestice, vrsta_lista, broj_lista_korisnika, datoteka) VALUES (NULL, 'Poslani dokument', 'Online', %s)", (f"{up_doc.name}|||{b64}",))
                 conn.commit()
-                st.success("✅ Spremljeno u bazu!")
+                st.success("✅ Spremljeno u bazu!")    
                 st.session_state["uploader_kljuc"] += 1
                 st.rerun()
             except Exception as e: st.error(f"Greška: {e}")
@@ -126,7 +130,7 @@ with glavni_col2:
             
                   # 3. ELSE: PRIKAZUJEMO VELIKU TABLICU KOJA PRATI ODABRANO PODRUČJE
         
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, c.naziv_zemljista, p.naziv_podrucja, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
+            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.naziv_zemljista, c.oznaka_zemljista, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
             parametri = None
             
             if odabrano_p != "Sva područja":
@@ -140,8 +144,9 @@ with glavni_col2:
                 "broj_cestice": "Broj čestice", 
                 "zk_ulozak": "Broj ZK uloška", 
                 "katastarska_opcina": "Katastarska općina", 
-                "naziv_zemljista": "Naziv zemljišta",
                 "naziv_podrucja": "Područje", 
+                "naziv_zemljista": "Naziv zemljišta",
+                "oznaka_zemljista": "Oznaka zemljišta",
                 "povrsina": "Površina (m²)"
             }
             df = df.rename(columns=preimenovani_stupci)
