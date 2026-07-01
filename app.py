@@ -65,8 +65,7 @@ with glavni_col1:
     st.markdown("### 🧭 Navigacija")
     izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
     st.write("---")
-    st.markdown("### 🗺️ Točnu poziciju čestice na karti pogledajte ovdje")
-    st.markdown("[🌍 Geoportal Katastra (Uređena Zemlja)](https://oss.uredjenazemlja.hr/map)")
+    st.markdown("[🌍 Točnu poziciju čestice na karti pogledajte ovdje](https://oss.uredjenazemlja.hr/map)")
 
 
 # =========================================================================
