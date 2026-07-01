@@ -64,9 +64,9 @@ glavni_col1, glavni_col2 = st.columns([1, 4])
 with glavni_col1:
     st.markdown("### 🧭 Navigacija")
     izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
+    
+    st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr/map)")
     st.write("---")
-    st.markdown("[🌍 Točna pozicija čestice na karti](https://oss.uredjenazemlja.hr/map)")
-
 
 # =========================================================================
 # 🚀 DESNI DIO: LOGIKA PRIKAZA EKRANA OVISNO O ODABIRU
