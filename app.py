@@ -124,7 +124,7 @@ with glavni_col2:
                     if dat and "|||" in dat:
                         ime, b64_kod = dat.split("|||", 1)
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
-                        if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), use_container_width=True)
+                        if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), width='stretch')
         else:
             
                   # 3. ELSE: PRIKAZUJEMO VELIKU TABLICU KOJA PRATI ODABRANO PODRUČJE
@@ -168,7 +168,7 @@ with glavni_col2:
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
     elif izbor == "📋 Posjedovni listovi":
         st.title("📋 Katastarski Posjedovni Listovi")
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list'")
+        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list' AND broj_lista_korisnika NOT ILIKE '%Ne postoji podatak o identifikaciji%'")
         svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pl:
@@ -184,7 +184,7 @@ with glavni_col2:
                 
                 st.write("---")
                 if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
                 elif naziv_datoteke.lower().endswith('.pdf'):
                     pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
                     st.markdown(pdf_prikaz, unsafe_allow_html=True)
@@ -212,7 +212,7 @@ with glavni_col2:
                 indeks = mk_imena.index(odabir_osobe)
                 # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike predka
                 b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
-                st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                st.image(base64.b64decode(b64_sadrzaj), width='stretch')
         else: st.info("Nema matičnih knjiga.")
 
     # --- 📂 EKRAN 4: DOKUMENTI OD RODBINE ---
@@ -231,7 +231,7 @@ with glavni_col2:
                 b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
                 
                 if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), use_container_width=True)
+                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
                 elif naziv_datoteke.lower().endswith('.pdf'):
                     pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0" width="100%" height="800" type="application/pdf"></iframe>'
                     st.markdown(pdf_prikaz, unsafe_allow_html=True)
