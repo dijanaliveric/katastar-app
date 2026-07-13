@@ -43,6 +43,12 @@ if not st.session_state["autentificiran"]:
         else: st.error("❌ Nevazeće lozinke.")
     st.stop()
 
+    # Postavljanje zadanih vrijednosti u memoriju aplikacije na samom početku
+if "odabrana_zona" not in st.session_state: st.session_state["odabrana_zona"] = "Sve zone"
+if "odabrani_zk" not in st.session_state: st.session_state["odabrani_zk"] = "Svi ZK ulošci"
+if "odabrana_vrsta_lista" not in st.session_state: st.session_state["odabrana_vrsta_lista"] = "Sve vrste lista"
+
+
 # --- SPAJANJE NA BAZU S TIMEOUTOM ---
 conn = psycopg2.connect(
     host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
@@ -51,8 +57,6 @@ conn = psycopg2.connect(
     options="-c statement_timeout=5000"
 )
 cursor = conn.cursor()
-
-
 # =========================================================================
 # 🏛️ UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
@@ -65,14 +69,55 @@ with glavni_col1:
     st.markdown("### 🧭 Navigacija")
     izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
     
-    st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr/map)")
+    st.markdown("[🌍 Pozicija čestice na karti](https://uredjenazemlja.hr)")
+    st.write("---")
+    
+          # --- PAMETNI I BRZI FILTERI UNUTAR LIJEVOG STUPCA ---
+    if izbor == "🗺️ Pregled i pretraga čestica":
+        
+        # 1. Korak: Provjeravamo što je trenutno odabrano u desnom stupcu (koristimo 'get' da ne pukne)
+        trenutna_c = st.session_state.get("odabrana_c_kljuc", "-- Prikaži sve čestice --")
+        
+        # 2. Korak: Filtere prikazujemo i bazu opterećujemo SAMO ako korisnik gleda veliku tablicu
+        if trenutna_c == "-- Prikaži sve čestice --":
+            st.markdown("### 🔍 Napredno filtriranje")
+            
+            # Zone
+            cursor.execute("SELECT DISTINCT zona FROM cestice WHERE zona IS NOT NULL AND zona != '' ORDER BY zona")
+            sve_zone = ["Sve zone"] + [r for r, in cursor.fetchall()]
+            odabrana_zona = st.pills("Zona:", sve_zone, default="Sve zone", key="zona_filter")
+            
+            # ZK Ulošci
+            cursor.execute("SELECT DISTINCT zk_ulozak FROM cestice WHERE zk_ulozak IS NOT NULL ORDER BY zk_ulozak")
+            svi_zk = ["Svi ZK ulošci"] + [str(r) for r, in cursor.fetchall()]
+            odabrani_zk = st.pills("ZK uložak:", svi_zk, default="Svi ZK ulošci", key="zk_filter")
+            
+            # Vrste listova
+            cursor.execute("""
+                SELECT DISTINCT pd.vrsta_lista FROM povijest_dokumenata pd
+                WHERE pd.vrsta_lista IN ('Vlasnički list', 'Posjedovni list')
+                  AND pd.id_cestice NOT IN (SELECT id FROM cestice WHERE id IN (999999, 777777))
+                ORDER BY pd.vrsta_lista
+            """)
+            sve_vrste_lista = ["Sve vrste lista"] + [r for r, in cursor.fetchall()]
+            odabrana_vrsta_lista = st.pills("Vrsta lista:", sve_vrste_lista, default="Sve vrste lista", key="lista_filter")
+        else:
+            st.caption("🔍 _Napredni filteri dostupni su u pregledu svih čestica._")
+            odabrana_zona = st.session_state.get("zona_filter", "Sve zone")
+            odabrani_zk = st.session_state.get("zk_filter", "Svi ZK ulošci")
+            odabrana_vrsta_lista = st.session_state.get("lista_filter", "Sve vrste lista")
+    else:
+        # Sigurnosne zadane vrijednosti za ostale ekrane (sprječava preostale greške)
+        odabrana_zona = "Sve zone"
+        odabrani_zk = "Svi ZK ulošci"
+        odabrana_vrsta_lista = "Sve vrste lista"
+
     st.write("---")
 
 # =========================================================================
 # 🚀 DESNI DIO: LOGIKA PRIKAZA EKRANA OVISNO O ODABIRU
 # =========================================================================
 with glavni_col2:
-    # --- 🗺️ EKRAN 1: PREGLED ČESTICA ---
     if izbor == "🗺️ Pregled i pretraga čestica":
         st.title("🗺️ Obiteljska Arhiva Katastra")
         if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
@@ -90,18 +135,44 @@ with glavni_col2:
 
         st.write("---")
         col_f1, col_f2 = st.columns(2)
+        
         cursor.execute("SELECT id, naziv_podrucja FROM podrucja")
         p_dict = {naziv: id for id, naziv in cursor.fetchall()}
         with col_f1: odabrano_p = st.selectbox("Odaberi područje:", ["Sva područja"] + list(p_dict.keys()))
 
-                # NOVO STANJE: Sakrivamo tehničke zapise iz padajućeg izbornika čestica
-        if odabrano_p == "Sva područja": 
-            cursor.execute("SELECT id, broj_cestice FROM cestice WHERE broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')")
-        else: 
-            cursor.execute("SELECT id, broj_cestice FROM cestice WHERE id_podrucja = %s AND broj_cestice NOT IN ('OPCE', 'MATICNE', 'OPCI_DOC')", (p_dict[odabrano_p],))
+               # --- TRAJNA BLOKADA TEHNIČKIH ČESTICA ZA PADUĆI IZBORNIK ---
+        upit_za_cestice = "SELECT c.id, c.broj_cestice FROM cestice c WHERE c.id NOT IN (999999, 777777)"
+        parametri_c = []
+        
+        if odabrano_p != "Sva područja":
+            upit_za_cestice += " AND c.id_podrucja = %s"
+            parametri_c.append(p_dict[odabrano_p])
+            
+        if odabrana_zona != "Sve zone":
+            upit_za_cestice += " AND c.zona = %s"
+            parametri_c.append(odabrana_zona)
+            
+        if odabrani_zk != "Svi ZK ulošci":
+            upit_za_cestice += " AND c.zk_ulozak::text = %s"
+            parametri_c.append(odabrani_zk)
+            
+        # Čisti filter za vrstu lista, bez ikakvih iznimki
+        if odabrana_vrsta_lista != "Sve vrste lista":
+            upit_za_cestice += """ 
+                AND EXISTS (
+                    SELECT 1 FROM povijest_dokumenata pd 
+                    WHERE pd.id_cestice = c.id 
+                      AND pd.vrsta_lista = %s
+                )
+            """
+            parametri_c.append(odabrana_vrsta_lista)
 
+        upit_za_cestice += " ORDER BY c.broj_cestice"
+        cursor.execute(upit_za_cestice, tuple(parametri_c))
         c_dict = {broj: id for id, broj in cursor.fetchall()}
-        with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()))
+        
+       # with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()))
+        with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()), key="odabrana_c_kljuc")
 
         st.write("---")
         if odabrana_c != "-- Prikaži sve čestice --":
@@ -111,7 +182,6 @@ with glavni_col2:
             c1, c2, c3 = st.columns(3)
             c1.info(f"**📑 K.O.:** {ko}\n\n**🔢 ZK Uložak:** {zk}")
             c2.info(f"**🌿 Oznaka:** {oz}\n\n**🗺️ Naziv:** {nz}")
-            #c2.info(f"**🏷️ Zona:** `{zon if zon else 'Nema na mapi'}`")
             c3.success(f"**🏷️ Zona:** `{zon if zon else '-'}`\n\n**📐 Površina:** {pov} m²")
             if nap: st.info(f"📝 Napomena: {nap}")
             
@@ -126,19 +196,51 @@ with glavni_col2:
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), width='stretch')
         else:
-            
-                  # 3. ELSE: PRIKAZUJEMO VELIKU TABLICU KOJA PRATI ODABRANO PODRUČJE
-        
-            upit = "SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, p.naziv_podrucja, c.naziv_zemljista, c.oznaka_zemljista, c.povrsina FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id"
-            parametri = None
+                   
+                
+            upit_tablica = """
+                SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, 
+                       p.naziv_podrucja, c.naziv_zemljista, c.oznaka_zemljista, c.povrsina 
+                FROM cestice c 
+                JOIN podrucja p ON c.id_podrucja = p.id
+                WHERE c.id NOT IN (999999, 777777)
+            """
+            parametri_t = []
             
             if odabrano_p != "Sva područja":
-                upit += " WHERE c.id_podrucja = %s"
-                parametri = [p_dict[odabrano_p]]
+                upit_tablica += " AND c.id_podrucja = %s"
+                parametri_t.append(p_dict[odabrano_p])
                 
-            df = pd.read_sql_query(upit, conn, params=parametri)
+            if odabrana_zona != "Sve zone":
+                upit_tablica += " AND c.zona = %s"
+                parametri_t.append(odabrana_zona)
+                
+            if odabrani_zk != "Svi ZK ulošci":
+                upit_tablica += " AND c.zk_ulozak::text = %s"
+                parametri_t.append(odabrani_zk)
+                
+            if odabrana_vrsta_lista != "Sve vrste lista":
+                upit_tablica += """ 
+                    AND EXISTS (
+                        SELECT 1 FROM povijest_dokumenata pd 
+                        WHERE pd.id_cestice = c.id 
+                          AND pd.vrsta_lista = %s
+                    )
+                """
+                parametri_t.append(odabrana_vrsta_lista)
+                
+           
+    
+            df = pd.read_sql_query(upit_tablica, conn, params=parametri_t if parametri_t else None)
+                        
+            # ---  ZA ANALITIKU ---
+            if not df.empty:
+                # ZK uložak ostavljamo kao tekst (mora biti string) i pretvaramo NULL u prazan tekst
+                df['zk_ulozak'] = df['zk_ulozak'].fillna('').astype(str)
+                # Samo površinu pretvaramo u čisti broj za statistiku i računanje sume
+                df['povrsina'] = pd.to_numeric(df['povrsina'], errors='coerce').fillna(0).astype(float)
+
             
-            # Preimenovanje stupaca za ljepši prikaz rodbini
             preimenovani_stupci = {
                 "broj_cestice": "Broj čestice", 
                 "zk_ulozak": "Broj ZK uloška", 
@@ -150,11 +252,10 @@ with glavni_col2:
             }
             df = df.rename(columns=preimenovani_stupci)
             
-            # Prikazujemo tablicu preko cijele širine ekrana laptopa
+            # Prikaz tablice s otključanom analitikom na desni klik
             st.dataframe(df, width='stretch', hide_index=True)
             
-            # RAČUNANJE UKUPNE POVRŠINE (SADA SIGURNO UNUTAR ISPRAVNOG RAZMAKA)
-            ukupna_povrsina = pd.to_numeric(df['Površina (m²)'], errors='coerce').fillna(0).sum()
+            ukupna_povrsina = df['Površina (m²)'].sum() if not df.empty else 0
             st.write("")
             col_prazan1, col_prazan2, col_Desno = st.columns(3)
             with col_Desno:
@@ -162,7 +263,6 @@ with glavni_col2:
                     label=f"📐 Ukupna površina ({odabrano_p}):", 
                     value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²"
                 )
-
 
 
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
