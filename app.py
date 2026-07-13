@@ -105,14 +105,14 @@ with glavni_col2:
 
         st.write("---")
         if odabrana_c != "-- Prikaži sve čestice --":
-            cursor.execute("SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s", (c_dict[odabrana_c],))
-            zk, dn, oz, nz, nap, pov, lok, ko, sif = cursor.fetchone()
+            cursor.execute("SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra, c.zona FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s", (c_dict[odabrana_c],))
+            zk, dn, oz, nz, nap, pov, lok, ko, sif, zon = cursor.fetchone()
             st.markdown(f"### 📍 Podaci za česticu: **{odabrana_c}** ({lok})")
             c1, c2, c3 = st.columns(3)
             c1.info(f"**📑 K.O.:** {ko}\n\n**🔢 ZK Uložak:** {zk}")
             c2.info(f"**🌿 Oznaka:** {oz}\n\n**🗺️ Naziv:** {nz}")
-            c3.success(f"**📐 Površina:**\n\n### {pov} m²")
-           # st.markdown(f"**🏷️ Kategorija:** `{sif if sif else 'Bez šifre'}`")
+            #c2.info(f"**🏷️ Zona:** `{zon if zon else 'Nema na mapi'}`")
+            c3.success(f"**🏷️ Zona:** `{zon if zon else '-'}`\n\n**📐 Površina:** {pov} m²")
             if nap: st.info(f"📝 Napomena: {nap}")
             
             st.write("---")
