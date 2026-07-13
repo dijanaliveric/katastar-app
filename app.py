@@ -69,7 +69,7 @@ with glavni_col1:
     st.markdown("### 🧭 Navigacija")
     izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
     
-    st.markdown("[🌍 Pozicija čestice na karti](https://uredjenazemlja.hr)")
+    st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr)")
     st.write("---")
     
           # --- PAMETNI I BRZI FILTERI UNUTAR LIJEVOG STUPCA ---
