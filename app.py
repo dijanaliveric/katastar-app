@@ -9,7 +9,7 @@ import pandas as pd
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# --- 🔒 TOTALNO BRISANJE GORNJE TRAKE I ZAŠTITA SLIKA ---
+# ---  BRISANJE GORNJE TRAKE I ZAŠTITA SLIKA ---
 st.markdown("""
     <style>
     /* Trajno i neprobojno gasi cijelu gornju traku i Fork gumb na svim uređajima */
@@ -28,7 +28,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- JEDNOSTAVNA ZAŠTITA ZA ULAZ ---
+# ---  ZAŠTITA ZA ULAZ ---
 if "autentificiran" not in st.session_state:
     st.session_state["autentificiran"] = False
 
@@ -62,7 +62,6 @@ cursor = conn.cursor()
 # =========================================================================
 popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
 
-# Dijelimo cijeli ekran na dva dijela: Lijevi (Izbornik) i Desni (Sadržaj)
 glavni_col1, glavni_col2 = st.columns([1, 4])
 
 with glavni_col1:
@@ -72,14 +71,12 @@ with glavni_col1:
     st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr)")
     st.write("---")
     
-          # --- PAMETNI I BRZI FILTERI UNUTAR LIJEVOG STUPCA ---
+          # --- BRZI FILTERI UNUTAR LIJEVOG STUPCA ---
     if izbor == "🗺️ Pregled i pretraga čestica":
         
-        # 1. Korak: Provjeravamo što je trenutno odabrano u desnom stupcu (koristimo 'get' da ne pukne)
-        trenutna_c = st.session_state.get("odabrana_c_kljuc", "-- Prikaži sve čestice --")
+        trenutna_c = st.session_state.get("odabrana_c_kljuc", " 🔍 SVE ")
         
-        # 2. Korak: Filtere prikazujemo i bazu opterećujemo SAMO ako korisnik gleda veliku tablicu
-        if trenutna_c == "-- Prikaži sve čestice --":
+        if trenutna_c == " 🔍 SVE ":      
             st.markdown("### 🔍 Napredno filtriranje")
             
             # Zone
@@ -155,7 +152,7 @@ with glavni_col2:
         p_dict = {naziv: id for id, naziv in cursor.fetchall()}
         with col_f1: odabrano_p = st.selectbox("Odaberi područje:", ["Sva područja"] + list(p_dict.keys()))
 
-               # --- TRAJNA BLOKADA TEHNIČKIH ČESTICA ZA PADUĆI IZBORNIK ---
+            
         upit_za_cestice = "SELECT c.id, c.broj_cestice FROM cestice c WHERE c.id NOT IN (999999, 777777)"
         parametri_c = []
         
@@ -171,7 +168,6 @@ with glavni_col2:
             upit_za_cestice += " AND c.zk_ulozak::text = %s"
             parametri_c.append(odabrani_zk)
             
-        # Čisti filter za vrstu lista, bez ikakvih iznimki
         if odabrana_vrsta_lista != "Sve vrste lista":
             upit_za_cestice += """ 
                 AND EXISTS (
@@ -186,11 +182,21 @@ with glavni_col2:
         cursor.execute(upit_za_cestice, tuple(parametri_c))
         c_dict = {broj: id for id, broj in cursor.fetchall()}
         
-       # with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()))
-        with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()), key="odabrana_c_kljuc")
+       # with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()), key="odabrana_c_kljuc")
+
+        popis_opcija_c = [" 🔍 SVE "] + list(c_dict.keys())
+
+        with col_f2: 
+            odabrana_c = st.selectbox(
+                "Odaberi broj čestice:", 
+                popis_opcija_c, 
+                key="odabrana_c_kljuc"
+            )
+
 
         st.write("---")
-        if odabrana_c != "-- Prikaži sve čestice --":
+        
+        if odabrana_c != " 🔍 SVE ":
             cursor.execute("SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra, c.zona FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s", (c_dict[odabrana_c],))
             zk, dn, oz, nz, nap, pov, lok, ko, sif, zon = cursor.fetchone()
             st.markdown(f"### 📍 Podaci za česticu: **{odabrana_c}** ({lok})")
@@ -280,7 +286,7 @@ with glavni_col2:
                     value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²"
                 )
                       
-            st.write("---") # Linija razdvajanja ispod površine
+            st.write("---")
             
             
 
@@ -291,13 +297,12 @@ with glavni_col2:
         svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pl:
-            # POPRAVLJENO: Uzimamo indeks [0] da dobijemo čisto ime za padajući izbornik
+            #  indeks [0] da dobijemo čisto ime za padajući izbornik
             pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
             odabrani_pl_ime = st.selectbox("📄 Odaberite posjedovni list:", [""] + pl_imena)
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
-                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike
-                              # TOČNA ZAMJENA: Razdvajamo ime i Base64 sadržaj
+                #  indeks [1] za  Base64 kod slike
                 naziv_datoteke = svi_pl[indeks].split("|||", 1)[0]
                 b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
                 
@@ -321,7 +326,7 @@ with glavni_col2:
         if sve_mk:
             mk_imena = []
             for f in sve_mk:
-                # POPRAVLJENO: Uzimamo indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
+                # indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
                 ime_datoteke = f.split("|||", 1)[0]
                 cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
                 mk_imena.append(f"Arhiv: {cisto_ime.upper()} MLINAR")
@@ -329,7 +334,7 @@ with glavni_col2:
             odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
             if odabir_osobe != "":
                 indeks = mk_imena.index(odabir_osobe)
-                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike predka
+                #  indeks [1] za čisti Base64 kod slike predka
                 b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
                 st.image(base64.b64decode(b64_sadrzaj), width='stretch')
         else: st.info("Nema matičnih knjiga.")
