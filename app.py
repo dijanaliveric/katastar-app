@@ -87,6 +87,20 @@ with glavni_col1:
             sve_zone = ["Sve zone"] + [r for r, in cursor.fetchall()]
             odabrana_zona = st.pills("Zona:", sve_zone, default="Sve zone", key="zona_filter")
             
+
+            with st.popover("📖 Legenda - zone", use_container_width=True):
+                st.markdown("""
+            **Službena značenja oznaka (Grad Obrovac):**
+            
+            * **M4** – **Mješovita namjena:** Građevinska zona unutar naselja predviđena za stanovanje i prateće obiteljske/gospodarske sadržaje
+            * **OZ-1** – **Ostalo zemljište:** Krš i neplodno tlo. Dozvoljena samo manja spremišta za alat i kućice za čuvanje maslinika/vinograda
+            * **ŠO-1** – **Zemljište namijenjeno šumi:** Šumsko tlo. Dozvoljena je gradnja šumske infrastrukture (planinarski/lovački domovi)
+            * **VZP-1** – **Vrijedno poljoprivredno zemljište:** Visokokvalitetno poljoprivredno tlo izvan obalnog pojasa; nije građevinska zona 
+            * **ZOP-1000** – **Zaštićeni obalni pojas:** Područje unutar 1000m od mora pod strogom državnom zaštitom i ograničenjima.
+            * **T2** – **Turistička namjena:** Područje predviđeno isključivo za hotele i turistička naselja.
+            """)
+                
+            
             # ZK Ulošci
             cursor.execute("SELECT DISTINCT zk_ulozak FROM cestice WHERE zk_ulozak IS NOT NULL ORDER BY zk_ulozak")
             svi_zk = ["Svi ZK ulošci"] + [str(r) for r, in cursor.fetchall()]
@@ -111,6 +125,7 @@ with glavni_col1:
         odabrana_zona = "Sve zone"
         odabrani_zk = "Svi ZK ulošci"
         odabrana_vrsta_lista = "Sve vrste lista"
+        
 
     st.write("---")
 
@@ -254,6 +269,7 @@ with glavni_col2:
             
             # Prikaz tablice s otključanom analitikom na desni klik
             st.dataframe(df, width='stretch', hide_index=True)
+        
             
             ukupna_povrsina = df['Površina (m²)'].sum() if not df.empty else 0
             st.write("")
@@ -263,7 +279,10 @@ with glavni_col2:
                     label=f"📐 Ukupna površina ({odabrano_p}):", 
                     value=f"{int(ukupna_povrsina):,}".replace(",", " ") + " m²"
                 )
-
+                      
+            st.write("---") # Linija razdvajanja ispod površine
+            
+            
 
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
     elif izbor == "📋 Posjedovni listovi":
