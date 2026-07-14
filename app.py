@@ -242,15 +242,57 @@ with glavni_col2:
             
             st.write("---")
             st.markdown("### ⏳ Povijesna Arhiva Listova")
-            cursor.execute("SELECT vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, datoteka FROM povijest_dokumenata WHERE id_cestice = %s", (c_dict[odabrana_c],))
+            cursor.execute("SELECT vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, id FROM povijest_dokumenata WHERE id_cestice = %s", (c_dict[odabrana_c],))
+            
+
+                        # Zadržan je vaš originalni raspored varijabli, gdje je 'dat' (sada ID) na kraju!
+          
+
+
+                     # Zamijenite vašu staru petlju s ovim popravljenim kodom:
             for v, br, st_g, vl, p_n, dat in cursor.fetchall():
                 with st.expander(f"📄 {v} br. {br} ({st_g})"):
                     st.write(f"👤 {vl} | 💬 {p_n}")
-                    if dat and "|||" in dat:
-                        ime, b64_kod = dat.split("|||", 1)
-                        st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
-                        if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), width='stretch')
-                        
+                    
+                    if st.button("👁️ Prikaži / Otvori dokument", key=f"btn_c_{dat}", use_container_width=True):
+                        with st.spinner("⏳ Dohvaćam dokument iz arhive..."):
+                            
+                            # 1. ČISTI SQL TRIK: Izvlačimo dio iza '|||' i dekodiramo Base64 izravno na Postgres serveru!
+                            # split_part razdvaja ime i b64 kod, a decode pretvara b64 u čiste binarne podatke (bytea)
+                            cursor.execute("""
+                                SELECT 
+                                    split_part(datoteka, '|||', 1) as ime_datoteke,
+                                    decode(split_part(datoteka, '|||', 2), 'base64') as binarni_podaci
+                                FROM povijest_dokumenata 
+                                WHERE id = %s
+                            """, (dat,))
+                            
+                            rezultat = cursor.fetchone()
+                            
+                        # 2. Provjera i trenutni prikaz bez ikakvog mučenja memorije u Pythonu
+                        if rezultat and rezultat[0] and rezultat[1]:
+                            ime = rezultat[0]
+                            # memoryview/bytes pretvara Postgres bytea izravno u čiste bajtove za download
+                            binarni = bytes(rezultat[1])
+                            
+                            # A. Prikaz slika
+                            if ime.lower().endswith(('.jpg', '.jpeg', '.png')):
+                                st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                                st.image(binarni, width='stretch')
+                                
+                            # B. Prikaz i otvaranje PDF-a
+                            elif ime.lower().endswith('.pdf'):
+                                st.success(f"✅ Dokument `{ime}` je uspješno učitan!")
+                                st.download_button(
+                                    "📥 Otvori / Preuzmi PDF", 
+                                    binarni, 
+                                    file_name=ime, 
+                                    mime="application/pdf", 
+                                    use_container_width=True
+                                )
+                        else:
+                            st.error("❌ Greška: Datoteka ne postoji ili format nije ispravan.")
+
         # 2. KLJUČNI POPRAVAK: Umjesto čistog 'else:', stavljamo 'elif' koji provjerava čisti "SVE"
         # Ovo u potpunosti gasi tablicu na drugim ekranima i ubrzava navigaciju!
 
