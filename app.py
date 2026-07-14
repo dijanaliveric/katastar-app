@@ -57,6 +57,27 @@ conn = psycopg2.connect(
     options="-c statement_timeout=5000"
 )
 cursor = conn.cursor()
+
+
+# =========================================================================
+# 🧹 MEHANIZAM ZA ULTRA-BRZO ČIŠĆENJE MEMORIJE PRI PROMJENI EKRANA
+# =========================================================================
+if "zadnji_odabir" not in st.session_state:
+    st.session_state["zadnji_odabir"] = "🗺️ Pregled i pretraga čestica"
+
+# Prisluškujemo promjenu na radijskim gumbima navigacije
+if "navigacija_izbor" in st.session_state:
+    trenutni_izbor = st.session_state["navigacija_izbor"]
+    
+    # Ako je korisnik kliknuo na neki drugi odjeljak (npr. Matične knjige)
+    if trenutni_izbor != st.session_state["zadnji_odabir"]:
+        # Resetiramo odabir čestice natrag na "SVE" kako bismo ugasili pojedinačni prikaz i b64 upite
+        if "odabrana_c_kljuc" in st.session_state:
+            st.session_state["odabrana_c_kljuc"] = "SVE"
+        
+        # Spremamo novo stanje navigacije (BEZ st.rerun(), dopuštamo aplikaciji da normalno promijeni ekran)
+        st.session_state["zadnji_odabir"] = trenutni_izbor
+
 # =========================================================================
 # 🏛️ UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
@@ -66,7 +87,9 @@ glavni_col1, glavni_col2 = st.columns([1, 4])
 
 with glavni_col1:
     st.markdown("### 🧭 Navigacija")
-    izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
+    #izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
+    izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed", key="navigacija_izbor")
+
     
     st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr)")
     st.write("---")
@@ -130,7 +153,7 @@ with glavni_col1:
 # 🚀 DESNI DIO: LOGIKA PRIKAZA EKRANA OVISNO O ODABIRU
 # =========================================================================
 with glavni_col2:
-    if izbor == "🗺️ Pregled i pretraga čestica":
+    if izbor == "🗺️ Pregled i pretraga čestica":    
         st.title("🗺️ Obiteljska Arhiva Katastra")
         if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
         up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf", "xlsx"], key=f"up_{st.session_state['uploader_kljuc']}")
@@ -155,6 +178,7 @@ with glavni_col2:
             
         upit_za_cestice = "SELECT c.id, c.broj_cestice FROM cestice c WHERE c.id NOT IN (999999, 777777)"
         parametri_c = []
+        
         
         if odabrano_p != "Sva područja":
             upit_za_cestice += " AND c.id_podrucja = %s"
@@ -182,21 +206,25 @@ with glavni_col2:
         cursor.execute(upit_za_cestice, tuple(parametri_c))
         c_dict = {broj: id for id, broj in cursor.fetchall()}
         
-       # with col_f2: odabrana_c = st.selectbox("Odaberi broj čestice:", ["-- Prikaži sve čestice --"] + list(c_dict.keys()), key="odabrana_c_kljuc")
-
-        popis_opcija_c = [" 🔍 SVE "] + list(c_dict.keys())
+        # U pozadini koristimo čistu riječ "SVE", a rodbini preko format_func prikazujemo predivnu oznaku s povećalom
+        opcije_cestica = ["SVE"] + list(c_dict.keys())
 
         with col_f2: 
             odabrana_c = st.selectbox(
                 "Odaberi broj čestice:", 
-                popis_opcija_c, 
-                key="odabrana_c_kljuc"
+                options=opcije_cestica,
+                key="odabrana_c_kljuc",
+                format_func=lambda x: " 🔍 SVE " if x == "SVE" else str(x)
             )
+
 
 
         st.write("---")
         
-        if odabrana_c != " 🔍 SVE ":
+        # 1. PROMIJENJENO: Uvjet provjerava čistu riječ "SVE" (sigurno za online rad)
+
+        
+        if odabrana_c != "SVE":
             cursor.execute("SELECT c.zk_ulozak, c.broj_zadnjeg_dnevnika, c.oznaka_zemljista, c.naziv_zemljista, c.napomena, c.povrsina, p.naziv_podrucja, c.katastarska_opcina, c.sifra, c.zona FROM cestice c JOIN podrucja p ON c.id_podrucja = p.id WHERE c.id = %s", (c_dict[odabrana_c],))
             zk, dn, oz, nz, nap, pov, lok, ko, sif, zon = cursor.fetchone()
             st.markdown(f"### 📍 Podaci za česticu: **{odabrana_c}** ({lok})")
@@ -216,9 +244,13 @@ with glavni_col2:
                         ime, b64_kod = dat.split("|||", 1)
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         if ime.lower().endswith(('.jpg', '.jpeg', '.png')): st.image(base64.b64decode(b64_kod), width='stretch')
-        else:
+                        
+        # 2. KLJUČNI POPRAVAK: Umjesto čistog 'else:', stavljamo 'elif' koji provjerava čisti "SVE"
+        # Ovo u potpunosti gasi tablicu na drugim ekranima i ubrzava navigaciju!
+
+        
+        elif odabrana_c == "SVE":
                    
-                
             upit_tablica = """
                 SELECT c.broj_cestice, c.zk_ulozak, c.katastarska_opcina, 
                        p.naziv_podrucja, c.naziv_zemljista, c.oznaka_zemljista, c.povrsina 
@@ -250,8 +282,6 @@ with glavni_col2:
                 """
                 parametri_t.append(odabrana_vrsta_lista)
                 
-           
-    
             df = pd.read_sql_query(upit_tablica, conn, params=parametri_t if parametri_t else None)
                         
             # ---  ZA ANALITIKU ---
@@ -261,7 +291,6 @@ with glavni_col2:
                 # Samo površinu pretvaramo u čisti broj za statistiku i računanje sume
                 df['povrsina'] = pd.to_numeric(df['povrsina'], errors='coerce').fillna(0).astype(float)
 
-            
             preimenovani_stupci = {
                 "broj_cestice": "Broj čestice", 
                 "zk_ulozak": "Broj ZK uloška", 
@@ -276,7 +305,6 @@ with glavni_col2:
             # Prikaz tablice s otključanom analitikom na desni klik
             st.dataframe(df, width='stretch', hide_index=True)
         
-            
             ukupna_povrsina = df['Površina (m²)'].sum() if not df.empty else 0
             st.write("")
             col_prazan1, col_prazan2, col_Desno = st.columns(3)
@@ -287,7 +315,7 @@ with glavni_col2:
                 )
                       
             st.write("---")
-            
+    
             
 
         # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
@@ -326,7 +354,7 @@ with glavni_col2:
         if sve_mk:
             mk_imena = []
             for f in sve_mk:
-                # indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
+                # POPRAVLJENO: Uzimamo indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
                 ime_datoteke = f.split("|||", 1)[0]
                 cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
                 mk_imena.append(f"Arhiv: {cisto_ime.upper()} MLINAR")
@@ -334,7 +362,7 @@ with glavni_col2:
             odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
             if odabir_osobe != "":
                 indeks = mk_imena.index(odabir_osobe)
-                #  indeks [1] za čisti Base64 kod slike predka
+                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike predka
                 b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
                 st.image(base64.b64decode(b64_sadrzaj), width='stretch')
         else: st.info("Nema matičnih knjiga.")
