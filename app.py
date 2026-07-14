@@ -214,7 +214,7 @@ with glavni_col2:
                 "Odaberi broj čestice:", 
                 options=opcije_cestica,
                 key="odabrana_c_kljuc",
-                format_func=lambda x: " 🔍 SVE " if x == "SVE" else str(x)
+                format_func=lambda x: "SVE" if x == "SVE" else str(x)
             )
 
 
