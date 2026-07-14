@@ -373,23 +373,23 @@ with glavni_col2:
         svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
 
         if svi_pl:
-            #  indeks [0] da dobijemo čisto ime za padajući izbornik
             pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
             odabrani_pl_ime = st.selectbox("📄 Odaberite posjedovni list:", [""] + pl_imena)
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
-                #  indeks [1] za  Base64 kod slike
                 naziv_datoteke = svi_pl[indeks].split("|||", 1)[0]
                 b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
                 
                 st.write("---")
+                # UKLJUČENO: Vaš stari prikaz slika
                 if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                     st.image(base64.b64decode(b64_sadrzaj), width='stretch')
+                # UKLJUČENO: Vaš stari prikaz PDF-a kroz iframe
                 elif naziv_datoteke.lower().endswith('.pdf'):
                     pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
                     st.markdown(pdf_prikaz, unsafe_allow_html=True)
-
-        else: st.info("Nema dokumenata u bazi.")
+        else: 
+            st.info("Nema dokumenata u bazi.")
 
     # --- 📜 EKRAN 3: MATIČNE KNJIGE ----
     elif izbor == "📜 Matične knjige":
@@ -426,18 +426,22 @@ with glavni_col2:
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
             if odabir_doc != "":
                 indeks = p_imena.index(odabir_doc)
-                # POPRAVLJENO: Točno raspakiravamo naziv [0] i Base64 kod [1] iz baze
                 naziv_datoteke = svi_pos[indeks].split("|||", 1)[0]
                 b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
                 
+                st.write("---")
+                # UKLJUČENO: Vaš stari prikaz slika
                 if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                     st.image(base64.b64decode(b64_sadrzaj), width='stretch')
+                # UKLJUČENO: Vaš stari prikaz PDF-a kroz iframe
                 elif naziv_datoteke.lower().endswith('.pdf'):
                     pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0" width="100%" height="800" type="application/pdf"></iframe>'
                     st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                # UKLJUČENO: Vaš stari prikaz Office datoteka
                 elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
                     st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=base64.b64decode(b64_sadrzaj), file_name=naziv_datoteke, key=f"dl_{naziv_datoteke}")
-        else: st.info("Nema dokumenata.")
+        else: 
+            st.info("Nema dokumenata.")
 
 conn.close()
 
