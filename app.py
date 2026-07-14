@@ -366,28 +366,53 @@ with glavni_col2:
     
             
 
-        # --- 📋 EKRAN 2: POSJEDOVNI LISTOVI ---
+       # =========================================================================
+    # 📋 EKRAN 2: KATASTARSKI POSJEDOVNI LISTOVI
+    # =========================================================================
     elif izbor == "📋 Posjedovni listovi":
         st.title("📋 Katastarski Posjedovni Listovi")
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list' AND broj_lista_korisnika NOT ILIKE '%Ne postoji podatak o identifikaciji%'")
-        svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+        
+        # 1. BRZI UPIT: Povlačimo samo ID i cijeli tekst datoteke, ali bez punjenja memorije unaprijed
+        cursor.execute("SELECT id, datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list' AND broj_lista_korisnika NOT ILIKE '%Ne postoji podatak o identifikaciji%'")
+        rezultati_baze = cursor.fetchall()
+        
+        # Izvlačimo podatke pazeći na strukturu torke iz Postgresa (r[1] je datoteka, r[0] je id)
+        svi_pl = [r[1] for r in rezultati_baze if r and "|||" in r[1]]
+        pl_ids = [r[0] for r in rezultati_baze if r and "|||" in r[1]]
 
         if svi_pl:
+            # Dobivamo čisto ime za padajući izbornik iz prve polovice teksta
             pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
             odabrani_pl_ime = st.selectbox("📄 Odaberite posjedovni list:", [""] + pl_imena)
+            
             if odabrani_pl_ime != "":
                 indeks = pl_imena.index(odabrani_pl_ime)
-                naziv_datoteke = svi_pl[indeks].split("|||", 1)[0]
-                b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
+                odabrani_id = pl_ids[indeks]
                 
-                st.write("---")
-                # UKLJUČENO: Vaš stari prikaz slika
-                if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
-                # UKLJUČENO: Vaš stari prikaz PDF-a kroz iframe
-                elif naziv_datoteke.lower().endswith('.pdf'):
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                with st.spinner("⏳ Dohvaćam dokument..."):
+                    # 🔥 LAZY LOADING: Tek nakon izbora povlačimo Base64 za taj konkretni ID
+                    cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id = %s", (odabrani_id,))
+                    rezultat_doc = cursor.fetchone()
+                
+                if rezultat_doc and rezultat_doc[0] and "|||" in rezultat_doc[0]:
+                    naziv_datoteke, b64_sadrzaj = rezultat_doc[0].split("|||", 1)
+                    
+                    st.write("---")
+                    # Prikaz slika
+                    if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        st.image(base64.b64decode(b64_sadrzaj), width='stretch')
+                    # Prikaz PDF-a prilagođen za Chrome (zaobilazi sigurnosne blokade)
+                    elif naziv_datoteke.lower().endswith('.pdf'):
+                        pdf_podaci = f"data:application/pdf;base64,{b64_sadrzaj}"
+                        pdf_prikaz = f"""
+                            <object data="{pdf_podaci}" type="application/pdf" width="100%" height="800px">
+                                <embed src="{pdf_podaci}" type="application/pdf" />
+                                <div style="padding: 20px; text-align: center; background-color: #f8d7da; color: #721c24; border-radius: 5px;">
+                                    ⚠️ Vaš preglednik ne podržava izravan prikaz. Preporučujemo preuzimanje dokumenta.
+                                </div>
+                            </object>
+                        """
+                        st.markdown(pdf_prikaz, unsafe_allow_html=True)
         else: 
             st.info("Nema dokumenata u bazi.")
 
@@ -415,31 +440,54 @@ with glavni_col2:
                 st.image(base64.b64decode(b64_sadrzaj), width='stretch')
         else: st.info("Nema matičnih knjiga.")
 
-    # --- 📂 EKRAN 4: DOKUMENTI OD RODBINE ---
+        # =========================================================================
+    # 📂 EKRAN 4: DOKUMENTACIJA O DIOBI
+    # =========================================================================
     elif izbor == "📂 Dokumenti":
         st.title("📂 Dokumentacija o Diobi")
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-        svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+        
+        # 1. BRZI UPIT: Povlačimo samo ID i tekst datoteke, bez opterećenja memorije preglednika
+        cursor.execute("SELECT id, datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
+        rezultati_baze = cursor.fetchall()
+        
+        svi_pos = [r[1] for r in rezultati_baze if r and "|||" in r[1]]
+        pos_ids = [r[0] for r in rezultati_baze if r and "|||" in r[1]]
 
         if svi_pos:
             p_imena = [f.split("|||", 1)[0] for f in svi_pos]
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
+            
             if odabir_doc != "":
                 indeks = p_imena.index(odabir_doc)
-                naziv_datoteke = svi_pos[indeks].split("|||", 1)[0]
-                b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
+                odabrani_id = pos_ids[indeks]
                 
-                st.write("---")
-                # UKLJUČENO: Vaš stari prikaz slika
-                if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
-                # UKLJUČENO: Vaš stari prikaz PDF-a kroz iframe
-                elif naziv_datoteke.lower().endswith('.pdf'):
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0" width="100%" height="800" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
-                # UKLJUČENO: Vaš stari prikaz Office datoteka
-                elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
-                    st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=base64.b64decode(b64_sadrzaj), file_name=naziv_datoteke, key=f"dl_{naziv_datoteke}")
+                with st.spinner("⏳ Dohvaćam dokument..."):
+                    # 🔥 LAZY LOADING: Tek nakon izbora povlačimo Base64 za taj konkretni ID
+                    cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id = %s", (odabrani_id,))
+                    rezultat_doc = cursor.fetchone()
+                
+                if rezultat_doc and rezultat_doc[0] and "|||" in rezultat_doc[0]:
+                    naziv_datoteke, b64_sadrzaj = rezultat_doc[0].split("|||", 1)
+                    
+                    st.write("---")
+                    # Prikaz slika
+                    if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        st.image(base64.b64decode(b64_sadrzaj), width='stretch')
+                    # Prikaz PDF-a prilagođen za Chrome
+                    elif naziv_datoteke.lower().endswith('.pdf'):
+                        pdf_podaci = f"data:application/pdf;base64,{b64_sadrzaj}"
+                        pdf_prikaz = f"""
+                            <object data="{pdf_podaci}" type="application/pdf" width="100%" height="800px">
+                                <embed src="{pdf_podaci}" type="application/pdf" />
+                                <div style="padding: 20px; text-align: center; background-color: #f8d7da; color: #721c24; border-radius: 5px;">
+                                    ⚠️ Vaš preglednik ne podržava izravan prikaz. Preporučujemo preuzimanje dokumenta.
+                                </div>
+                            </object>
+                        """
+                        st.markdown(pdf_prikaz, unsafe_allow_html=True)
+                    # Uredske datoteke (Excel, Word)
+                    elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
+                        st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=base64.b64decode(b64_sadrzaj), file_name=naziv_datoteke, key=f"dl_{naziv_datoteke}")
         else: 
             st.info("Nema dokumenata.")
 
