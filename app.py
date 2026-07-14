@@ -97,10 +97,11 @@ with glavni_col1:
           # --- BRZI FILTERI UNUTAR LIJEVOG STUPCA ---
     if izbor == "🗺️ Pregled i pretraga čestica":
         
-        trenutna_c = st.session_state.get("odabrana_c_kljuc", " 🔍 SVE ")
+        trenutna_c = st.session_state.get("odabrana_c_kljuc", "SVE")
         
-        if trenutna_c == " 🔍 SVE ":      
+        if trenutna_c == "SVE":      
             st.markdown("### 🔍 Napredno filtriranje")
+
             
             # Zone
             cursor.execute("SELECT DISTINCT zona FROM cestice WHERE zona IS NOT NULL AND zona != '' ORDER BY zona")
@@ -206,16 +207,21 @@ with glavni_col2:
         cursor.execute(upit_za_cestice, tuple(parametri_c))
         c_dict = {broj: id for id, broj in cursor.fetchall()}
         
-        # U pozadini koristimo čistu riječ "SVE", a rodbini preko format_func prikazujemo predivnu oznaku s povećalom
-        opcije_cestica = ["SVE"] + list(c_dict.keys())
+        
+
+        # Popis sadrži isključivo prave brojeve čestica iz baze
+        opcije_cestica = list(c_dict.keys())
 
         with col_f2: 
-            odabrana_c = st.selectbox(
+            odabrana_c_izbor = st.selectbox(
                 "Odaberi broj čestice:", 
                 options=opcije_cestica,
-                key="odabrana_c_kljuc",
-                format_func=lambda x: "SVE" if x == "SVE" else str(x)
+                index=None,  # Početno NIŠTA nije odabrano (što znači da se prikazuje velika tablica)
+                placeholder="Prikaži sve čestice..."  # Ovaj tekst se briše sam od sebe čim kliknete!
             )
+            
+        # Ako je korisnik odabrao česticu, koristimo nju, inače idemo na "SVE"
+        odabrana_c = odabrana_c_izbor if odabrana_c_izbor is not None else "SVE"
 
 
 
