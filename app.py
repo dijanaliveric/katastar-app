@@ -365,28 +365,74 @@ with glavni_col2:
             st.write("---")
     
             
+        # =========================================================================
+    # 📋 EKRAN 2: KATASTARSKI POSJEDOVNI LISTOVI
+    # =========================================================================
     elif izbor == "📋 Posjedovni listovi":
         st.title("📋 Katastarski Posjedovni Listovi")
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Posjedovni list' AND broj_lista_korisnika NOT ILIKE '%Ne postoji podatak o identifikaciji%'")
-        svi_pl = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+        
+        # 1. Povlačimo ID i tekst, ali samo prvi dio (naziv datoteke) radi brzine
+        cursor.execute("""
+            SELECT id, split_part(datoteka, '|||', 1) 
+            FROM povijest_dokumenata 
+            WHERE vrsta_lista = 'Posjedovni list' 
+              AND broj_lista_korisnika NOT ILIKE '%Ne postoji podatak o identifikaciji%'
+            ORDER BY id DESC
+        """)
+        rezultati_baze = cursor.fetchall()
 
-        if svi_pl:
-            #  indeks [0] da dobijemo čisto ime za padajući izbornik
-            pl_imena = [f.split("|||", 1)[0] for f in svi_pl]
+        if rezultati_baze:
+            # Stvaramo čisti rječnik: ključ je naziv datoteke, vrijednost je ID u bazi
+            pl_mape_id = {r[1]: r[0] for r in rezultati_baze if r[1] != ""}
+            pl_imena = list(pl_mape_id.keys())
+            
             odabrani_pl_ime = st.selectbox("📄 Odaberite posjedovni list:", [""] + pl_imena)
+            
             if odabrani_pl_ime != "":
-                indeks = pl_imena.index(odabrani_pl_ime)
-                #  indeks [1] za  Base64 kod slike
-                naziv_datoteke = svi_pl[indeks].split("|||", 1)[0]
-                b64_sadrzaj = svi_pl[indeks].split("|||", 1)[1]
+                odabrani_id = pl_mape_id[odabrani_pl_ime]
                 
-                st.write("---")
-                if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
-                elif naziv_datoteke.lower().endswith('.pdf'):
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0&navpanes=0" width="100%" height="800" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
-        else: st.info("Nema dokumenata u bazi.")
+                with st.spinner("⏳ Dohvaćam dokument iz arhive..."):
+                    # LAZY LOADING: Povlačimo cijeli Base64 string isključivo za odabrani ID
+                    cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id = %s", (odabrani_id,))
+                    rezultat_doc = cursor.fetchone()
+                
+                if rezultat_doc and rezultat_doc[0] and "|||" in rezultat_doc[0]:
+                    # Točno izvlačimo naziv i Base64 sadržaj iz baze podataka
+                    naziv_datoteke, b64_sadrzaj = rezultat_doc[0].split("|||", 1)
+                    binarni_podaci = base64.b64decode(b64_sadrzaj)
+                    
+                    st.write("---")
+                    
+                    # A. Ako je datoteka SLIKA (.jpg, .png)
+                    if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                        st.image(binarni_podaci, width='stretch')
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_pl_img_{odabrani_id}")
+                    
+                                        # B. Ako je datoteka PDF (Učitavanje prve stranice iz liste + gumb)
+                    elif naziv_datoteke.lower().endswith('.pdf'):
+                        try:
+                            from pdf2image import convert_from_bytes
+                            import io
+                            
+                            stranice = convert_from_bytes(binarni_podaci, dpi=130)
+                            if stranice:
+                                img_byte_arr = io.BytesIO()
+                                # ISPRAVLJENO: Dodano [0] kako bismo spremili isključivo PRVU stranicu iz liste!
+                                stranice[0].save(img_byte_arr, format='JPEG', quality=85)
+                                cista_slika = img_byte_arr.getvalue()
+                                
+                                # Crtamo prvu stranicu PDF-a izravno na ekranu (Chrome radi 100%)
+                                st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                                st.image(cista_slika, width='stretch')
+                                
+                                # Gumb za preuzimanje kompletnog PDF-a
+                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_pdf_ok_{odabrani_id}")
+                        except Exception as e:
+                            st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_pdf_err_{odabrani_id}")
+        else: 
+            st.info("Nema dokumenata u bazi.")
 
     # --- 📜 EKRAN 3: MATIČNE KNJIGE ----
     elif izbor == "📜 Matične knjige":
@@ -412,31 +458,72 @@ with glavni_col2:
                 st.image(base64.b64decode(b64_sadrzaj), width='stretch')
         else: st.info("Nema matičnih knjiga.")
 
-        # =========================================================================
+       # =========================================================================
     # 📂 EKRAN 4: DOKUMENTACIJA O DIOBI
     # =========================================================================
     elif izbor == "📂 Dokumenti":
         st.title("📂 Dokumentacija o Diobi")
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument'")
-        svi_pos = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
+        
+        # 1. BRZINA: Iz baze vučemo samo ID i naziv datoteke. Teški Base64 spava u bazi!
+        cursor.execute("SELECT id, split_part(datoteka, '|||', 1) FROM povijest_dokumenata WHERE vrsta_lista = 'Poslani dokument' ORDER BY id DESC")
+        rezultati_baze = cursor.fetchall()
 
-        if svi_pos:
-            p_imena = [f.split("|||", 1)[0] for f in svi_pos]
+        if rezultati_baze:
+            # Stvaramo čisti rječnik: ključ je naziv datoteke, vrijednost je ID u bazi
+            doc_mape_id = {r[1]: r[0] for r in rezultati_baze if r[1] != ""}
+            p_imena = list(doc_mape_id.keys())
+            
             odabir_doc = st.selectbox("Odaberite dokument:", [""] + p_imena)
+            
             if odabir_doc != "":
-                indeks = p_imena.index(odabir_doc)
-                naziv_datoteke = svi_pos[indeks].split("|||", 1)[0]
-                b64_sadrzaj = svi_pos[indeks].split("|||", 1)[1]
+                odabrani_id = doc_mape_id[odabir_doc]
                 
-                st.write("---")
-                if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    st.image(base64.b64decode(b64_sadrzaj), width='stretch')
-                elif naziv_datoteke.lower().endswith('.pdf'):
-                    pdf_prikaz = f'<iframe src="data:application/pdf;base64,{b64_sadrzaj}#toolbar=0" width="100%" height="800" type="application/pdf"></iframe>'
-                    st.markdown(pdf_prikaz, unsafe_allow_html=True)
-                elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
-                    st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=base64.b64decode(b64_sadrzaj), file_name=naziv_datoteke, key=f"dl_{naziv_datoteke}")
-        else: st.info("Nema dokumenata.")
+                with st.spinner("⏳ Dohvaćam dokument iz arhive..."):
+                    # LAZY LOADING: Povlačimo cijeli Base64 string isključivo za odabrani ID
+                    cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id = %s", (odabrani_id,))
+                    rezultat_doc = cursor.fetchone()
+                
+                if rezultat_doc and rezultat_doc[0] and "|||" in rezultat_doc[0]:
+                    # Točno izvlačimo naziv i Base64 sadržaj iz baze podataka
+                    naziv_datoteke, b64_sadrzaj = rezultat_doc[0].split("|||", 1)
+                    binarni_podaci = base64.b64decode(b64_sadrzaj)
+                    
+                    st.write("---")
+                    
+                    # A. Ako je datoteka SLIKA (.jpg, .png)
+                    if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                        st.image(binarni_podaci, width='stretch')
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_doc_img_{odabrani_id}")
+                    
+                    # B. Ako je datoteka PDF (Uzimamo prvu stranicu iz liste [0] i crtamo je kao sliku)
+                    elif naziv_datoteke.lower().endswith('.pdf'):
+                        try:
+                            from pdf2image import convert_from_bytes
+                            import io
+                            
+                            stranice = convert_from_bytes(binarni_podaci, dpi=130)
+                            if stranice:
+                                img_byte_arr = io.BytesIO()
+                                # POPRAVLJENO: Uzimamo točno prvu stranicu [0] iz liste slika
+                                stranice[0].save(img_byte_arr, format='JPEG', quality=85)
+                                cista_slika = img_byte_arr.getvalue()
+                                
+                                # Prikaz prve stranice na ekranu - stabilno za Chrome i Firefox
+                                st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                                st.image(cista_slika, width='stretch')
+                                
+                                # Gumb za preuzimanje cijelog PDF dokumenta
+                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_doc_pdf_{odabrani_id}")
+                        except Exception as e:
+                            st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_doc_err_{odabrani_id}")
+                    
+                    # C. Prikaz Office dokumenata (Excel, Word)
+                    elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
+                        st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=binarni_podaci, file_name=naziv_datoteke, key=f"dl_office_{odabrani_id}", use_container_width=True)
+        else: 
+            st.info("Nema dokumenata.")
 
 conn.close()
 
