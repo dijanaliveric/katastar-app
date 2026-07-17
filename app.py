@@ -245,11 +245,7 @@ with glavni_col2:
             cursor.execute("SELECT vrsta_lista, broj_lista_korisnika, starost_godina, upisani_vlasnik_posjednik, povijesna_napomena, id FROM povijest_dokumenata WHERE id_cestice = %s", (c_dict[odabrana_c],))
             
 
-                        # Zadržan je vaš originalni raspored varijabli, gdje je 'dat' (sada ID) na kraju!
-          
 
-
-                     # Zamijenite vašu staru petlju s ovim popravljenim kodom:
             for v, br, st_g, vl, p_n, dat in cursor.fetchall():
                 with st.expander(f"📄 {v} br. {br} ({st_g})"):
                     st.write(f"👤 {vl} | 💬 {p_n}")
@@ -305,7 +301,7 @@ with glavni_col2:
                 FROM cestice c 
                 JOIN podrucja p ON c.id_podrucja = p.id
                 WHERE c.id NOT IN (999999, 777777)
-                ORDER BY c.broj_cestice
+                
             """
             parametri_t = []
             
@@ -331,8 +327,19 @@ with glavni_col2:
                 """
                 parametri_t.append(odabrana_vrsta_lista)
                 
-            df = pd.read_sql_query(upit_tablica, conn, params=parametri_t if parametri_t else None)
-                        
+            #df = pd.read_sql_query(upit_tablica, conn, params=parametri_t if parametri_t else None)
+            #df = pd.read_sql_query(upit_tablica, conn, params=tuple(parametri_t) if parametri_t else None)
+            
+            
+            upit_tablica += " ORDER BY c.broj_cestice"
+
+            if parametri_t:
+                df = pd.read_sql_query(upit_tablica, conn, params=list(parametri_t))
+            else:
+                df = pd.read_sql_query(upit_tablica, conn)
+
+
+            
             # ---  ZA ANALITIKU ---
             if not df.empty:
                 # ZK uložak ostavljamo kao tekst (mora biti string) i pretvaramo NULL u prazan tekst
