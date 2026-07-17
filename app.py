@@ -81,15 +81,15 @@ if "navigacija_izbor" in st.session_state:
 # =========================================================================
 # 🏛️ UNUTARNJI BOČNI IZBORNIK PREKO ST.COLUMNS (ZAMJENA ZA SIDEBAR)
 # =========================================================================
-popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti"]
+popis_opcija = ["🗺️ Pregled i pretraga čestica", "📋 Posjedovni listovi", "📜 Matične knjige", "📂 Dokumenti", "👥 Odabir čestica", "⚖️ Upravljanje Diobom"]
 
 glavni_col1, glavni_col2 = st.columns([1, 4])
 
 with glavni_col1:
     st.markdown("### 🧭 Navigacija")
-    #izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed")
-    izbor = st.radio("Odaberite odjeljak:", popis_opcija, label_visibility="collapsed", key="navigacija_izbor")
-
+    je_admin = st.query_params.get("admin") == "da"
+    prikazane_opcije = popis_opcija if je_admin else popis_opcija[:-1]
+    izbor = st.radio("Odaberite odjeljak:", prikazane_opcije, label_visibility="collapsed", key="navigacija_izbor")
     
     st.markdown("[🌍 Pozicija čestice na karti](https://oss.uredjenazemlja.hr/map)")
     st.write("---")
@@ -305,6 +305,7 @@ with glavni_col2:
                 FROM cestice c 
                 JOIN podrucja p ON c.id_podrucja = p.id
                 WHERE c.id NOT IN (999999, 777777)
+                ORDER BY c.broj_cestice
             """
             parametri_t = []
             
@@ -434,29 +435,68 @@ with glavni_col2:
         else: 
             st.info("Nema dokumenata u bazi.")
 
-    # --- 📜 EKRAN 3: MATIČNE KNJIGE ----
+        # =========================================================================
+    # 📜 EKRAN 3: MATIČNE KNJIGE (POTPUNO OPTIMIZIRANO I UBRZANO)
+    # =========================================================================
     elif izbor == "📜 Matične knjige":
-        st.title("📜 Arhiv Matičnih Knjiga")
-        st.caption("🏛️ *Izvor dokumentacije: Državni arhiv u Zadru*")
+        st.title("📜 Matične knjige")
+        
+        # 1. BRZINA: Iz baze vučemo samo ID i naziv datoteke. Teški Base64 spava u bazi!
+        cursor.execute("SELECT id, split_part(datoteka, '|||', 1) FROM povijest_dokumenata WHERE id_cestice = 777777 ORDER BY id DESC")
+        rezultati_baze = cursor.fetchall()
 
-        cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE vrsta_lista = 'Matična knjiga'")
-        sve_mk = [r[0] for r in cursor.fetchall() if r and "|||" in r[0]]
-
-        if sve_mk:
-            mk_imena = []
-            for f in sve_mk:
-                # POPRAVLJENO: Uzimamo indeks [0] iz splita da dobijemo čisto ime datoteke, pa čistimo ekstenziju
-                ime_datoteke = f.split("|||", 1)[0]
-                cisto_ime = ime_datoteke.rsplit('.', 1)[0] if '.' in ime_datoteke else ime_datoteke
-                mk_imena.append(f"Arhiv: {cisto_ime.upper()} MLINAR")
+        if rezultati_baze:
+            # Stvaramo čisti rječnik: ključ je naziv datoteke, vrijednost je ID u bazi
+            mat_mape_id = {r[1]: r[0] for r in rezultati_baze if r[1] != ""}
+            mat_imena = list(mat_mape_id.keys())
+            
+            odabrana_mat_ime = st.selectbox("📜 Odaberite matičnu knjigu:", [""] + mat_imena)
+            
+            if odabrana_mat_ime != "":
+                odabrani_id = mat_mape_id[odabrana_mat_ime]
                 
-            odabir_osobe = st.selectbox("👤 Odaberite zapis za pregled:", [""] + mk_imena)
-            if odabir_osobe != "":
-                indeks = mk_imena.index(odabir_osobe)
-                # POPRAVLJENO: Uzimamo indeks [1] za čisti Base64 kod slike predka
-                b64_sadrzaj = sve_mk[indeks].split("|||", 1)[1]
-                st.image(base64.b64decode(b64_sadrzaj), width='stretch')
-        else: st.info("Nema matičnih knjiga.")
+                with st.spinner("⏳ Dohvaćam matičnu knjigu iz arhive..."):
+                    # LAZY LOADING: Povlačimo cijeli Base64 string isključivo za odabrani ID
+                    cursor.execute("SELECT datoteka FROM povijest_dokumenata WHERE id = %s", (odabrani_id,))
+                    rezultat_doc = cursor.fetchone()
+                
+                if rezultat_doc and rezultat_doc[0] and "|||" in rezultat_doc[0]:
+                    naziv_datoteke, b64_sadrzaj = rezultat_doc[0].split("|||", 1)
+                    binarni_podaci = base64.b64decode(b64_sadrzaj)
+                    
+                    st.write("---")
+                    
+                    # A. Ako je datoteka SLIKA (.jpg, .png)
+                    if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                        st.image(binarni_podaci, width='stretch')  # 🔥 PAŽLJIVO UKLJUČEN width='stretch'
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_mat_img_{odabrani_id}")
+                    
+                    # B. Ako je datoteka PDF (Uzimamo prvu stranicu iz liste i crtamo je kao sliku)
+                    elif naziv_datoteke.lower().endswith('.pdf'):
+                        try:
+                            from pdf2image import convert_from_bytes
+                            import io
+                            
+                            stranice = convert_from_bytes(binarni_podaci, dpi=130)
+                            if stranice:
+                                img_byte_arr = io.BytesIO()
+                                # Uzimamo točno prvu stranicu iz liste slika
+                                s_stranica = stranice[0]
+                                s_stranica.save(img_byte_arr, format='JPEG', quality=85)
+                                cista_slika = img_byte_arr.getvalue()
+                                
+                                # Prikaz prve stranice na ekranu - stabilno za Chrome i Firefox
+                                st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
+                                st.image(cista_slika, width='stretch')  # 🔥 PAŽLJIVO UKLJUČEN width='stretch'
+                                
+                                # Gumb za preuzimanje cijelog PDF dokumenta
+                                st.download_button(label="📥 Preuzmi cijelu matičnu knjigu (PDF)", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_mat_pdf_{odabrani_id}")
+                        except Exception as e:
+                            st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_mat_err_{odabrani_id}")
+        else: 
+            st.info("Nema matičnih knjiga u bazi.")
 
        # =========================================================================
     # 📂 EKRAN 4: DOKUMENTACIJA O DIOBI
@@ -525,5 +565,13 @@ with glavni_col2:
         else: 
             st.info("Nema dokumenata.")
 
-conn.close()
+    elif izbor == "👥 Odabir čestica":
+        import nasljednici
+        nasljednici.prikazi_ekran_nasljednika(cursor, conn)
+
+    elif izbor == "⚖️ Upravljanje Diobom":
+        import dioba_admin
+        dioba_admin.prikazi_ekran_administracije(cursor, conn)
+
+
 
