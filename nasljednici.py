@@ -102,7 +102,6 @@ def prikazi_ekran_nasljednika(cursor, conn):
 
     # 4. PRIPREMA PANDAS DATAFRAME-A 
     for indeks_retka, (cid, broj, zk, podrucje_naziv, oznaka, naziv, napomena, zon, povrsina) in enumerate(sve_cestice):
-        # 🔥 2. KORAK: Cita cisti tekst ('Interes' ili 'Dodijeljeno') ili vraca None ako je nema u bazi
         status_trenutni = stanja_iz_baze.get(cid, None)
         is_checked = cid in trenutno_oznacene_ids
 

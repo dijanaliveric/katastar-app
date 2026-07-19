@@ -3,7 +3,7 @@ import pandas as pd
 import psycopg2
 from zoneinfo import ZoneInfo
 
- # =========================================================================
+    # =========================================================================
     # ⚖️ KUTAK ZA ADMINA I ODVJETNIKA (MINIMALISTIČKA DODJELA)
     # =========================================================================
 def prikazi_ekran_administracije(cursor, conn):
@@ -79,7 +79,7 @@ def prikazi_ekran_administracije(cursor, conn):
                 popis_nasljednika.append(lijepi_prikaz)
             
            #================================================================================================
-                # 🟢  ALAT ZA UPRAVLJANJE LJUDIMA I PROMJENU STATUSA
+                #   ALAT ZA UPRAVLJANJE LJUDIMA I PROMJENU STATUSA
            #================================================================================================     
         with st.expander("🛠️ Otvori upravljanje nasljednicima i šifrarnikom (Unos / Odricanje / Brisanje)"):
             col_admin1, col_admin2 = st.columns(2)
@@ -88,8 +88,7 @@ def prikazi_ekran_administracije(cursor, conn):
                 st.markdown("**➕ Dodaj novog nasljednika (Bilo koji red):**")
                 novo_ime = st.text_input("Ime i prezime nasljednika:", placeholder="npr. UNUK ANTE", key="adm_novo_ime")
                 
-                # 🔥 NOVO: Dinamički izvlačimo sva postojeća imena prednika iz baze za padajući izbornik
-                # Stvaramo rječnik: ključ je predivno IME na ekranu, a vrijednost je njegov BROJ_GRANE u pozadini
+                # Dinamički izvlači sva postojeća imena prednika iz baze za padajući izbornik
                 grane_iz_baze = {}
                 for _, grana_id, prednik_ime, _, _, _, _ in svi_nasljednici_baza:
                     grane_iz_baze[prednik_ime] = grana_id
@@ -123,12 +122,17 @@ def prikazi_ekran_administracije(cursor, conn):
                 ljudi_opcije = {}
                 popis_aktivnih_za_korist = {} # Ovdje čuvamo samo žive ljude za prijenos udjela
                 
+                                # 🔥 1. KORAK: Mapiramo ID-ove u stvarna imena kako bismo ih mogli pročitati na klik (0% kvačica)
+                id_u_ime = {redak[0]: redak[3] for redak in svi_nasljednici_baza}
+
+                # 2. KORAK: Punimo opcije za prikaz s točnim imenom u korist koga se odriče
                 for lid, grana_id, pred, ime_n, red, odr, kor in svi_nasljednici_baza:
                     status_tekst = "❌ ODREKAO SE" if odr else "✅ AKTIVAN"
                     
-                    # Ako je netko dobio udio, u zagradi prikažemo ID onoga u čiju korist se odriče radi kontrole
+                    # 🔥 POPRAVLJENO: Izvlačimo ime nasljednika u čiju korist se netko odrekao umjesto ID-a
                     if odr and kor:
-                        status_tekst = f"❌ U KORIST ID: {kor}"
+                        ime_korisnika = id_u_ime.get(kor, f"ID: {kor}")
+                        status_tekst = f"❌ U KORIST: {ime_korisnika}"
                         
                     ljudi_opcije[f"{pred} -> {ime_n} [{status_tekst}]"] = (lid, odr, ime_n)
                     
@@ -137,7 +141,7 @@ def prikazi_ekran_administracije(cursor, conn):
                         popis_aktivnih_za_korist[f"{pred} -> {ime_n}"] = lid
                     
                 odabrana_osoba = st.selectbox("Odaberite člana obitelji za izmjenu:", [""] + list(ljudi_opcije.keys()), key="adm_sel_osoba")
-                
+
                 if odabrana_osoba != "":
                     osoba_id, trenutno_odrekao, trenutno_ime = ljudi_opcije[odabrana_osoba]
                     
@@ -183,7 +187,6 @@ def prikazi_ekran_administracije(cursor, conn):
 
         if poklikane_cestice:
             podaci_za_odvjetnika = []
-            # TOČNO 8 VARIJABLI ZA RASPRAZITI (ZADNJI JE ZON)
             for cid, broj, zk, podrucje, povrsina, nasljednik, status, zon in poklikane_cestice:
                 podaci_za_odvjetnika.append({
                     "ID Čestice": cid,
@@ -197,22 +200,136 @@ def prikazi_ekran_administracije(cursor, conn):
                 })
             
             df_odvjetnik = pd.DataFrame(podaci_za_odvjetnika)
+            trenutni_iz_baze = df_odvjetnik["Kome pripada (Nasljednik)"].dropna().unique()
+            popis_s_opcijom = ["", "👥 SUVLASNIŠTVO (Više osoba)"] + list(popis_nasljednika)
+            
+            for stavka in trenutni_iz_baze:
+                if stavka not in popis_s_opcijom and str(stavka).strip() != "":
+                    popis_s_opcijom.append(stavka)
 
-            # 2. TABLICA ZA ODVJETNIKA - UKLJUČENA ZONA U POPIS ONEMOGUĆENIH POLJA
+
+            #popis_s_opcijom = ["", "👥 SUVLASNIŠTVO (Više osoba)"] + list(popis_nasljednika)
+
             uredjeni_df_odvjetnik = st.data_editor(
                 df_odvjetnik,
                 hide_index=True,
                 disabled=["ID Čestice", "Broj čestice", "Zona", "ZK Uložak", "Područje", "Površina (m²)"],
                 width="stretch",
                 column_config={
-                    "Kome pripada (Nasljednik)": st.column_config.SelectboxColumn("Kome pripada (Nasljednik)", options=popis_nasljednika, default=""),
+                    "Kome pripada (Nasljednik)": st.column_config.SelectboxColumn("Kome pripada (Nasljednik)", options=popis_s_opcijom, default=""),
                     "Status": st.column_config.SelectboxColumn("Status", options=["Interes", "Dodijeljeno"], default="Interes")
                 },
                 key="editor_odvjetnika"
             )
 
+            # 2. KORAK: Automatsko spremanje običnih odabira + otvaranje kvačica za suvlasništvo (0% kvačica)
+            izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
+            
+            # if izmjene:
+            #     for indeks_retka, promijenjena_polja in izmjene.items():
+            #         id_c = int(df_odvjetnik.iloc[int(indeks_retka)]["ID Čestice"])
+            #         broj_c = str(df_odvjetnik.iloc[int(indeks_retka)]["Broj čestice"])
+                    
+            #         # Ako je odabrana opcija SUVLASNIŠTVO, otvaramo panel s kvačicama ispod tablice
+            #         if promijenjena_polja.get("Kome pripada (Nasljednik)") == "👥 SUVLASNIŠTVO (Više osoba)":
+            #             st.write("---")
+            #             st.markdown(f"### 👥 Odaberite suvlasnike iz baze za česticu **{broj_c}**")
+                        
+            #             # Čisti izbornik s kvačicama koji vuče ljude direktno iz vaše baze
+            #             odabrani_suvlasnici = st.multiselect(
+            #                 "Klikom označite nasljednike (bez utipkavanja):",
+            #                 options=popis_nasljednika,
+            #                 key=f"multi_suv_{id_c}"
+            #             )
+                        
+            #             if st.button("💾 Spremi suvlasnike", key=f"btn_suv_{id_c}", type="primary"):
+            #                 imena_skupa = ", ".join(odabrani_suvlasnici) if odabrani_suvlasnici else ""
+            #                 cursor.execute(
+            #                     "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = 'Dodijeljeno' WHERE id_cestice = %s",
+            #                     (imena_skupa, id_c)
+            #                 )
+            #                 conn.commit()
+            #                 st.success(f"Uspješno spremljeno suvlasništvo: {imena_skupa}")
+            #                 st.rerun()
+                    
+                    # elif "Kome pripada (Nasljednik)" in promijenjena_polja or "Status" in promijenjena_polja:
+                    #     novi_nasljednik = promijenjena_polja.get("Kome pripada (Nasljednik)", df_odvjetnik.iloc[int(indeks_retka)]["Kome pripada (Nasljednik)"])
+                    #     novi_status = promijenjena_polja.get("Status", df_odvjetnik.iloc[int(indeks_retka)]["Status"])
+                        
+                    #     # Ako odvjetnik isprazni ime ILI prebaci status na Interes, brišemo dodjelu i vraćamo na početak
+                    #     if not novi_nasljednik or str(novi_nasljednik).strip() == "" or novi_status == "Interes":
+                    #         novi_nasljednik = ""
+                    #         novi_status = "Interes"
+                    #     elif novi_nasljednik and novi_nasljednik != "👥 SUVLASNIŠTVO (Više osoba)":
+                    #         # Ako je odabrano obično ime (nije kliknut gumb za suvlasništvo), automatski je dodijeljeno
+                    #         novi_status = "Dodijeljeno"
+                            
+                    #     # Trajno ažuriramo bazu i vraćamo česticu u prvobitno stanje
+                    #     cursor.execute(
+                    #         "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s WHERE id_cestice = %s",
+                    #         (novi_nasljednik, novi_status, id_c)
+                    #     )
+                    #     conn.commit()
+                    #     st.rerun()
+
+                       # 2. KORAK: Automatsko spremanje običnih odabira + otvaranje kvačica za suvlasništvo (0% kvačica)
+            izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
+            
+            if izmjene:
+                for indeks_retka, promijenjena_polja in izmjene.items():
+                    id_c = int(df_odvjetnik.iloc[int(indeks_retka)]["ID Čestice"])
+                    broj_c = str(df_odvjetnik.iloc[int(indeks_retka)]["Broj čestice"])
+                    
+                    # 🔥 SLUČAJ A: Ako je odabrana opcija SUVLASNIŠTVO, otvaramo panel s kvačicama ispod tablice
+                    if promijenjena_polja.get("Kome pripada (Nasljednik)") == "👥 SUVLASNIŠTVO (Više osoba)":
+                        st.write("---")
+                        st.markdown(f"### 👥 Odaberite suvlasnike iz baze za česticu **{broj_c}**")
+                        
+                        # Čisti izbornik s kvačicama koji vuče ljude direktno iz vaše baze
+                        odabrani_suvlasnici = st.multiselect(
+                            "Klikom označite nasljednike (bez utipkavanja):",
+                            options=popis_nasljednika,
+                            key=f"multi_suv_{id_c}"
+                        )
+                        
+                        if st.button("💾 Spremi suvlasnike", key=f"btn_suv_{id_c}", type="primary"):
+                            imena_skupa = ", ".join(odabrani_suvlasnici) if odabrani_suvlasnici else ""
+                            cursor.execute(
+                                "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = 'Dodijeljeno' WHERE id_cestice = %s",
+                                (imena_skupa, id_c)
+                            )
+                            conn.commit()
+                            st.success(f"Uspješno spremljeno suvlasništvo: {imena_skupa}")
+                            st.rerun()
+                    
+                    # 🔥 SLUČAJ B: Ako je odabran običan nasljednik ili status, spremi odmah izravno u bazu
+                    elif "Kome pripada (Nasljednik)" in promijenjena_polja or "Status" in promijenjena_polja:
+                        novi_nasljednik = promijenjena_polja.get("Kome pripada (Nasljednik)", df_odvjetnik.iloc[int(indeks_retka)]["Kome pripada (Nasljednik)"])
+                        novi_status = promijenjena_polja.get("Status", df_odvjetnik.iloc[int(indeks_retka)]["Status"])
+                        
+                        # Ako odvjetnik isprazni ime ILI prebaci status na Interes, brišemo dodjelu i vraćamo na početak
+                        if not novi_nasljednik or str(novi_nasljednik).strip() == "" or novi_status == "Interes":
+                            novi_nasljednik = ""
+                            novi_status = "Interes"
+                        # Ako je odabrano suvlasništvo unutar običnog spremanja, status ostaje na Interes
+                        elif novi_nasljednik == "👥 SUVLASNIŠTVO (Više osoba)":
+                            novi_status = "Interes"
+                        elif novi_nasljednik:
+                            # Ako je odabrano obično ime (pojedinačni nasljednik), automatski je dodijeljeno
+                            novi_status = "Dodijeljeno"
+                            
+                        # Trajno ažuriramo bazu i vraćamo česticu u prvobitno stanje
+                        cursor.execute(
+                            "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s WHERE id_cestice = %s",
+                            (novi_nasljednik, novi_status, id_c)
+                        )
+                        conn.commit()
+                        st.rerun()
+
+
+
             # Gumb za brzi spas i upis dodjele u bazu
-            if st.button("⚖️ Spremi konačnu raspodjelu za odvjetnika", key="btn_save_odvjetnik", width="stretch"):
+            if st.button("⚖️ Spremi konačnu raspodjelu", key="btn_save_odvjetnik", width="stretch"):
                 promjene_odvjetnika = 0
                 for indeks_red, redak in uredjeni_df_odvjetnik.iterrows():
                     cid = int(redak["ID Čestice"])
@@ -258,11 +375,13 @@ def prikazi_ekran_administracije(cursor, conn):
             cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM sifrarnik_zona")
             koeficijenti_baza = {str(zona).strip().upper(): float(koef) for zona, koef in cursor.fetchall()}
 
-            # Filtriramo samo čestice koje je odvjetnik službeno prebacio u Dodijeljeno i koje imaju nasljednika
+                        # 🔥 POPRAVLJENO: Strogi filtar koji u sekundi briše ljude iz donje tablice na reset (0% kvačica)
             df_dodijeljeno = uredjeni_df_odvjetnik[
                 (uredjeni_df_odvjetnik["Status"] == "Dodijeljeno") & 
-                (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"] != "")
+                (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].notna()) &
+                (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].str.strip() != "")
             ].copy()
+
 
             if not df_dodijeljeno.empty:
                 # 🔥 POTPUNO ČISTA I DINAMIČKA FUNKCIJA (ČITA ISKJUČIVO IZ BAZE)
@@ -300,11 +419,46 @@ def prikazi_ekran_administracije(cursor, conn):
                 df_dodijeljeno["Koeficijent"] = df_dodijeljeno["Zona"].apply(dohvati_koef_iz_baze)
                 df_dodijeljeno["Vrijednosni bodovi"] = df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"]
 
-                # 3. GRUPIRANJE I RAČUNANJE STATISTIKE PO NASLJEDNICIMA
-                statistika = df_dodijeljeno.groupby("Kome pripada (Nasljednik)").agg({
-                    "Površina (m²)": "sum",
-                    "Vrijednosni bodovi": "sum"
-                }).reset_index()
+               
+                # =========================================================================
+                # MATEMATIKA ZA SUVLASNIŠTVO 
+                # =========================================================================
+                
+                # 3. RAZBIJANJE SUVLASNIŠTVA I DIJELJENJE VRIJEDNOSTI NA JEDNAKE DIJELOVE
+                razbijeni_podaci = []
+                
+                for _, red in df_dodijeljeno.iterrows():
+                    nasl_tekst = red["Kome pripada (Nasljednik)"]
+                    povrsina = float(red.get("Površina (m²)", 0))
+                    bodovi = float(red.get("Vrijednosni bodovi", 0))
+                    
+                    # Razbijamo tekst po zarezu i čistimo prazne razmake oko imena
+                    svi_nasljednici = [n.strip() for n in str(nasl_tekst).split(",") if n.strip()]
+                    broj_suvlasnika = len(svi_nasljednici)
+                    
+                    if broj_suvlasnika > 0:
+                        # Idealni dio: dijelimo površinu i bodove čestice na broj suvlasnika
+                        povrsina_po_osobi = povrsina / broj_suvlasnika
+                        bodovi_po_osobi = bodovi / broj_suvlasnika
+                        
+                        # Svakom suvlasniku zasebno pridružujemo njegov pripadajući dio
+                        for ime in svi_nasljednici:
+                            razbijeni_podaci.append({
+                                "Kome pripada (Nasljednik)": ime,
+                                "Površina (m²)": povrsina_po_osobi,
+                                "Vrijednosni bodovi": bodovi_po_osobi
+                            })
+                
+                # Pretvaramo u novi DataFrame i sada radimo čisto i sigurno grupiranje po pojedinačnim ljudima
+                if razbijeni_podaci:
+                    df_razbijeno = pd.DataFrame(razbijeni_podaci)
+                    statistika = df_razbijeno.groupby("Kome pripada (Nasljednik)").agg({
+                        "Površina (m²)": "sum",
+                        "Vrijednosni bodovi": "sum"
+                    }).reset_index()
+                else:
+                    # Ako nema podataka, stvaramo praznu strukturu da se kôd ispod ne sruši
+                    statistika = pd.DataFrame(columns=["Kome pripada (Nasljednik)", "Površina (m²)", "Vrijednosni bodovi"])
 
                 ukupno_m2 = statistika["Površina (m²)"].sum()
                 ukupno_bodova = statistika["Vrijednosni bodovi"].sum()
@@ -322,6 +476,7 @@ def prikazi_ekran_administracije(cursor, conn):
                     ukupno_posto = 100.00
                 else:
                     ukupno_posto = round(sirovi_zbroj_posto, 2)
+
 
                 # 4. FORMATIRANJE STUPACA NA 2 DECIMALE I DODAVANJE OZNAKE %
                 statistika["Ukupna stvarna površina"] = statistika["Površina (m²)"].apply(lambda x: f"{int(x):,} m²".replace(",", " "))
@@ -361,8 +516,17 @@ def prikazi_ekran_administracije(cursor, conn):
                 )
 
                 
+                # 🔥 POPRAVLJENO: Dinamički ispis točnih koeficijenata iz baze u samu napomenu (0% kvačica)
+                stavke_sifrarnika = []
+                for oznaka, koef in koeficijenti_baza.items():
+                    if oznaka != "-":  # Preskačemo sigurnosni default u popisu
+                        stavke_sifrarnika.append(f"**{oznaka}** ({koef:.2f})")
+                
+                popis_zona_tekst = ", ".join(stavke_sifrarnika)
+                
+                st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine s koeficijentom zone iz šifrarnika koji se trenutno primjenjuje za ovaj obračun: {popis_zona_tekst}. Kod čestica koje se protežu kroz više zona (kombinirane zone), sustav automatski prepoznaje sve navedene zone, ali obračun bodova temelji na koeficijentu najvrjednije priznate zone u toj kombinaciji. Time se vrijednost preostalih, manje vrijednih dijelova čestice u konačnom izračunu smanjuje u korist dominantne ekonomske cjeline.*")
 
-                st.caption("💡 *Napomena: Vrijednosni bodovi se računaju množenjem površine s koeficijentom zone iz šifrarnika baze podataka (DBeaver). Za kombinirane zone sustav automatski uzima koeficijent najvrjednije priznate zone u kombinaciji.*")
+               # st.caption("💡 *Napomena: Vrijednosni bodovi se računaju množenjem površine s koeficijentom zone iz šifrarnika baze podataka (DBeaver). Za kombinirane zone sustav automatski uzima koeficijent najvrjednije priznate zone u kombinaciji.*")
             else:
                 st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
 
