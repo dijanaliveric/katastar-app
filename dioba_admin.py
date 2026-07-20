@@ -107,7 +107,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 
                 if st.button("💾 Zapiši novog nasljednika", key="btn_adm_add_nasl", width="stretch"):
                     if novo_ime.strip() != "":
-                        # POPRAVLJENO: Upisujemo broj grane u OBA polja (id_prednika i broj_grane) prateći točan redoslijed vaše tablice!
                         cursor.execute("""
                             INSERT INTO popis_nasljednika (id_prednika, ime_nasljednika, broj_grane, ime_prednika, red_nasljedstva, odrekao_se) 
                             VALUES (%s, %s, %s, %s, %s, FALSE)
@@ -118,18 +117,15 @@ def prikazi_ekran_administracije(cursor, conn):
             with col_admin2:
                 st.markdown("**🔄 Promijeni status odricanja (U korist nekoga):**")
                 
-                # Radimo prelijep popis za administraciju u izborniku
+                # Popis za administraciju u izborniku
                 ljudi_opcije = {}
-                popis_aktivnih_za_korist = {} # Ovdje čuvamo samo žive ljude za prijenos udjela
-                
-                                # 🔥 1. KORAK: Mapiramo ID-ove u stvarna imena kako bismo ih mogli pročitati na klik (0% kvačica)
+                popis_aktivnih_za_korist = {} # Ovdje čuvamo samo žive ljude za prijenos udjela        
                 id_u_ime = {redak[0]: redak[3] for redak in svi_nasljednici_baza}
 
                 # 2. KORAK: Punimo opcije za prikaz s točnim imenom u korist koga se odriče
                 for lid, grana_id, pred, ime_n, red, odr, kor in svi_nasljednici_baza:
                     status_tekst = "❌ ODREKAO SE" if odr else "✅ AKTIVAN"
                     
-                    # 🔥 POPRAVLJENO: Izvlačimo ime nasljednika u čiju korist se netko odrekao umjesto ID-a
                     if odr and kor:
                         ime_korisnika = id_u_ime.get(kor, f"ID: {kor}")
                         status_tekst = f"❌ U KORIST: {ime_korisnika}"
@@ -146,7 +142,6 @@ def prikazi_ekran_administracije(cursor, conn):
                     osoba_id, trenutno_odrekao, trenutno_ime = ljudi_opcije[odabrana_osoba]
                     
                     if not trenutno_odrekao:
-                        # 🔥 NOVO: Izbornik prikazuje IME žive osobe, a ne hladne ID brojeve!
                         opcije_imena_korist = [x for x in popis_aktivnih_za_korist.keys() if popis_aktivnih_za_korist[x] != osoba_id]
                         u_korist_odabir = st.selectbox("Odriče se U KORIST (Odaberite osobu):", ["Nitko - dijeli se svima"] + opcije_imena_korist, key="adm_u_korist_sel")
                         
@@ -176,7 +171,7 @@ def prikazi_ekran_administracije(cursor, conn):
 
         # 1. UPIT ZA ODVJETNIKA - DODANA C.ZONA NA KRAJ SELECTA
         cursor.execute("""
-            SELECT dc.id_cestice, c.broj_cestice, c.zk_ulozak, p.naziv_podrucja, c.povrsina, dc.nasljednik, dc.status_diobe, c.zona
+            SELECT dc.id_cestice, c.broj_cestice, c.zk_ulozak, p.naziv_podrucja, c.povrsina, dc.nasljednik, dc.status_diobe, c.zona, dc.korekcija_postotak
             FROM dioba_cestica dc
             JOIN cestice c ON dc.id_cestice = c.id
             JOIN podrucja p ON c.id_podrucja = p.id
@@ -184,10 +179,12 @@ def prikazi_ekran_administracije(cursor, conn):
             ORDER BY c.broj_cestice
         """)
         poklikane_cestice = cursor.fetchall()
+    
 
         if poklikane_cestice:
-            podaci_za_odvjetnika = []
-            for cid, broj, zk, podrucje, povrsina, nasljednik, status, zon in poklikane_cestice:
+            podaci_za_odvjetnika = []        
+            for cid, broj, zk, podrucje, povrsina, nasljednik, status, zon, kor_postotak in poklikane_cestice:
+    
                 podaci_za_odvjetnika.append({
                     "ID Čestice": cid,
                     "Broj čestice": broj,
@@ -196,8 +193,13 @@ def prikazi_ekran_administracije(cursor, conn):
                     "Područje": podrucje,
                     "Površina (m²)": float(povrsina) if povrsina else 0.0,
                     "Kome pripada (Nasljednik)": nasljednik if nasljednik else "",
-                    "Status": status if status else "Interes"
+                    "Status": status if status else "Interes",
+                    "Korekcija vrijednosti (%)": float(kor_postotak) if kor_postotak is not None else 0.0,
+                    
+
                 })
+
+                               
             
             df_odvjetnik = pd.DataFrame(podaci_za_odvjetnika)
             trenutni_iz_baze = df_odvjetnik["Kome pripada (Nasljednik)"].dropna().unique()
@@ -207,9 +209,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 if stavka not in popis_s_opcijom and str(stavka).strip() != "":
                     popis_s_opcijom.append(stavka)
 
-
-            #popis_s_opcijom = ["", "👥 SUVLASNIŠTVO (Više osoba)"] + list(popis_nasljednika)
-
             uredjeni_df_odvjetnik = st.data_editor(
                 df_odvjetnik,
                 hide_index=True,
@@ -217,7 +216,14 @@ def prikazi_ekran_administracije(cursor, conn):
                 width="stretch",
                 column_config={
                     "Kome pripada (Nasljednik)": st.column_config.SelectboxColumn("Kome pripada (Nasljednik)", options=popis_s_opcijom, default=""),
-                    "Status": st.column_config.SelectboxColumn("Status", options=["Interes", "Dodijeljeno"], default="Interes")
+                    "Status": st.column_config.SelectboxColumn("Status", options=["Interes", "Dodijeljeno"], default="Interes"),
+                    # 2. KORAK: Konfiguriramo stupac kao brojčano polje koje se može uređivati
+                    "Korekcija vrijednosti (%)": st.column_config.NumberColumn(
+                    "Korekcija vrijednosti (%)", 
+                help="Upišite postotak u plusu (npr. 10) ili minusu (npr. -15) za prilagodbu vrijednosti",
+                format="%f", 
+                step=1.0
+                ),
                 },
                 key="editor_odvjetnika"
             )
@@ -225,110 +231,77 @@ def prikazi_ekran_administracije(cursor, conn):
             # 2. KORAK: Automatsko spremanje običnih odabira + otvaranje kvačica za suvlasništvo (0% kvačica)
             izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
             
-            # if izmjene:
-            #     for indeks_retka, promijenjena_polja in izmjene.items():
-            #         id_c = int(df_odvjetnik.iloc[int(indeks_retka)]["ID Čestice"])
-            #         broj_c = str(df_odvjetnik.iloc[int(indeks_retka)]["Broj čestice"])
-                    
-            #         # Ako je odabrana opcija SUVLASNIŠTVO, otvaramo panel s kvačicama ispod tablice
-            #         if promijenjena_polja.get("Kome pripada (Nasljednik)") == "👥 SUVLASNIŠTVO (Više osoba)":
-            #             st.write("---")
-            #             st.markdown(f"### 👥 Odaberite suvlasnike iz baze za česticu **{broj_c}**")
-                        
-            #             # Čisti izbornik s kvačicama koji vuče ljude direktno iz vaše baze
-            #             odabrani_suvlasnici = st.multiselect(
-            #                 "Klikom označite nasljednike (bez utipkavanja):",
-            #                 options=popis_nasljednika,
-            #                 key=f"multi_suv_{id_c}"
-            #             )
-                        
-            #             if st.button("💾 Spremi suvlasnike", key=f"btn_suv_{id_c}", type="primary"):
-            #                 imena_skupa = ", ".join(odabrani_suvlasnici) if odabrani_suvlasnici else ""
-            #                 cursor.execute(
-            #                     "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = 'Dodijeljeno' WHERE id_cestice = %s",
-            #                     (imena_skupa, id_c)
-            #                 )
-            #                 conn.commit()
-            #                 st.success(f"Uspješno spremljeno suvlasništvo: {imena_skupa}")
-            #                 st.rerun()
-                    
-                    # elif "Kome pripada (Nasljednik)" in promijenjena_polja or "Status" in promijenjena_polja:
-                    #     novi_nasljednik = promijenjena_polja.get("Kome pripada (Nasljednik)", df_odvjetnik.iloc[int(indeks_retka)]["Kome pripada (Nasljednik)"])
-                    #     novi_status = promijenjena_polja.get("Status", df_odvjetnik.iloc[int(indeks_retka)]["Status"])
-                        
-                    #     # Ako odvjetnik isprazni ime ILI prebaci status na Interes, brišemo dodjelu i vraćamo na početak
-                    #     if not novi_nasljednik or str(novi_nasljednik).strip() == "" or novi_status == "Interes":
-                    #         novi_nasljednik = ""
-                    #         novi_status = "Interes"
-                    #     elif novi_nasljednik and novi_nasljednik != "👥 SUVLASNIŠTVO (Više osoba)":
-                    #         # Ako je odabrano obično ime (nije kliknut gumb za suvlasništvo), automatski je dodijeljeno
-                    #         novi_status = "Dodijeljeno"
-                            
-                    #     # Trajno ažuriramo bazu i vraćamo česticu u prvobitno stanje
-                    #     cursor.execute(
-                    #         "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s WHERE id_cestice = %s",
-                    #         (novi_nasljednik, novi_status, id_c)
-                    #     )
-                    #     conn.commit()
-                    #     st.rerun()
+            
 
-                       # 2. KORAK: Automatsko spremanje običnih odabira + otvaranje kvačica za suvlasništvo (0% kvačica)
+            # 3. KORAK: Nadopuna petlje za spremanje svih promjena odjednom (0% kvačica)
             izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
             
             if izmjene:
+                promjene_odvjetnika = 0
                 for indeks_retka, promijenjena_polja in izmjene.items():
-                    id_c = int(df_odvjetnik.iloc[int(indeks_retka)]["ID Čestice"])
-                    broj_c = str(df_odvjetnik.iloc[int(indeks_retka)]["Broj čestice"])
+                    # 1. Čitamo izvorne podatke iz tablice za ovaj redak
+                    stari_nasljednik = df_odvjetnik.iloc[int(indeks_retka)]["Kome pripada (Nasljednik)"]
+                    stari_status = df_odvjetnik.iloc[int(indeks_retka)]["Status"]
+                    stara_korekcija = float(df_odvjetnik.iloc[int(indeks_retka)].get("Korekcija vrijednosti (%)", 0.0))
                     
-                    # 🔥 SLUČAJ A: Ako je odabrana opcija SUVLASNIŠTVO, otvaramo panel s kvačicama ispod tablice
-                    if promijenjena_polja.get("Kome pripada (Nasljednik)") == "👥 SUVLASNIŠTVO (Više osoba)":
+                    cid = int(df_odvjetnik.iloc[int(indeks_retka)]["ID Čestice"])
+                    broj = str(df_odvjetnik.iloc[int(indeks_retka)]["Broj čestice"])
+
+                    # 2. Izvlačimo nove vrijednosti ako ih je odvjetnik upisao
+                    novi_nasljednik = promijenjena_polja.get("Kome pripada (Nasljednik)", stari_nasljednik)
+                    novi_status = promijenjena_polja.get("Status", stari_status)
+                    
+                    nova_korekcija_sirovo = promijenjena_polja.get("Korekcija vrijednosti (%)", stara_korekcija)
+                    nova_korekcija = float(nova_korekcija_sirovo) if nova_korekcija_sirovo is not None else 0.0
+
+                    # 3. SLUČAJ A: Korisnik je odabrao opciju SUVLASNIŠTVO više osoba
+                    if novi_nasljednik == "👥 SUVLASNIŠTVO (Više osoba)":
                         st.write("---")
-                        st.markdown(f"### 👥 Odaberite suvlasnike iz baze za česticu **{broj_c}**")
+                        st.markdown(f"### 👥 Odaberite suvlasnike iz baze za česticu **{broj}**")
                         
                         # Čisti izbornik s kvačicama koji vuče ljude direktno iz vaše baze
                         odabrani_suvlasnici = st.multiselect(
                             "Klikom označite nasljednike (bez utipkavanja):",
                             options=popis_nasljednika,
-                            key=f"multi_suv_{id_c}"
+                            key=f"multi_suv_{cid}"
                         )
                         
-                        if st.button("💾 Spremi suvlasnike", key=f"btn_suv_{id_c}", type="primary"):
+                        if st.button("💾 Spremi suvlasnike", key=f"btn_suv_{cid}", type="primary"):
                             imena_skupa = ", ".join(odabrani_suvlasnici) if odabrani_suvlasnici else ""
                             cursor.execute(
-                                "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = 'Dodijeljeno' WHERE id_cestice = %s",
-                                (imena_skupa, id_c)
+                                "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = 'Dodijeljeno', korekcija_postotak = %s WHERE id_cestice = %s",
+                                (imena_skupa, nova_korekcija, cid)
                             )
                             conn.commit()
                             st.success(f"Uspješno spremljeno suvlasništvo: {imena_skupa}")
                             st.rerun()
                     
-                    # 🔥 SLUČAJ B: Ako je odabran običan nasljednik ili status, spremi odmah izravno u bazu
-                    elif "Kome pripada (Nasljednik)" in promijenjena_polja or "Status" in promijenjena_polja:
-                        novi_nasljednik = promijenjena_polja.get("Kome pripada (Nasljednik)", df_odvjetnik.iloc[int(indeks_retka)]["Kome pripada (Nasljednik)"])
-                        novi_status = promijenjena_polja.get("Status", df_odvjetnik.iloc[int(indeks_retka)]["Status"])
-                        
-                        # Ako odvjetnik isprazni ime ILI prebaci status na Interes, brišemo dodjelu i vraćamo na početak
+                    # 4. SLUČAJ B: Korisnik radi običnu dodjelu pojedinačnom nasljedniku
+                    else:
+                        # Automatska prilagodba statusa ovisno o upisu
                         if not novi_nasljednik or str(novi_nasljednik).strip() == "" or novi_status == "Interes":
                             novi_nasljednik = ""
                             novi_status = "Interes"
-                        # Ako je odabrano suvlasništvo unutar običnog spremanja, status ostaje na Interes
-                        elif novi_nasljednik == "👥 SUVLASNIŠTVO (Više osoba)":
-                            novi_status = "Interes"
                         elif novi_nasljednik:
-                            # Ako je odabrano obično ime (pojedinačni nasljednik), automatski je dodijeljeno
                             novi_status = "Dodijeljeno"
+
+                        # Ako se bilo koje od ova 3 polja razlikuje, radimo UPDATE u bazu
+                        if novi_nasljednik != stari_nasljednik or novi_status != stari_status or nova_korekcija != stara_korekcija:
+                            vrijednost_baza = novi_nasljednik if novi_nasljednik != "" else None
                             
-                        # Trajno ažuriramo bazu i vraćamo česticu u prvobitno stanje
-                        cursor.execute(
-                            "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s WHERE id_cestice = %s",
-                            (novi_nasljednik, novi_status, id_c)
-                        )
-                        conn.commit()
-                        st.rerun()
+                            # Ažuriramo stanje diobe i novi korekcijski postotak u bazi
+                            cursor.execute(
+                                "UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s, korekcija_postotak = %s WHERE id_cestice = %s", 
+                                (vrijednost_baza, novi_status, nova_korekcija, cid)
+                            )
+                            
+                            # Upisujemo u log
+                            akcija_log = f"DODIJELJENO ({novi_nasljednik}) [Kor: {nova_korekcija}%]" if novi_nasljednik != "" else "RESETIRANO"
+                            cursor.execute("INSERT INTO log_diobe_cestica (id_cestice, broj_cestice, akcija, ip_adresa) VALUES (%s, %s, %s, %s)", (cid, broj, akcija_log, ip_adresa))
+                            promjene_odvjetnika += 1
 
 
 
-            # Gumb za brzi spas i upis dodjele u bazu
             if st.button("⚖️ Spremi konačnu raspodjelu", key="btn_save_odvjetnik", width="stretch"):
                 promjene_odvjetnika = 0
                 for indeks_red, redak in uredjeni_df_odvjetnik.iterrows():
@@ -382,12 +355,11 @@ def prikazi_ekran_administracije(cursor, conn):
                 (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].str.strip() != "")
             ].copy()
 
+            
+
 
             if not df_dodijeljeno.empty:
-                # 🔥 POTPUNO ČISTA I DINAMIČKA FUNKCIJA (ČITA ISKJUČIVO IZ BAZE)
                 def dohvati_koef_iz_baze(zona_tekst):
-                    # Iz baze čitamo sigurnosni default kojeg kontrolirate kroz redak '-' u DBeaveru
-                    # Ako tog retka nema u bazi, sustav uzima 1.00 (neutralna vrijednost, čisti m²)
                     sigurnosni_default = koeficijenti_baza.get("-", 1.00)
                     
                     if not zona_tekst or str(zona_tekst).strip() == "" or str(zona_tekst).strip() == "-":
@@ -414,10 +386,11 @@ def prikazi_ekran_administracije(cursor, conn):
                         
                     # KORAK C: Ako baš ništa iz kombinacije nije prepoznato u šifrarniku
                     return sigurnosni_default
-
-                # Računamo bodove
+                df_dodijeljeno["Faktor Korekcije"] = 1.0 + (df_dodijeljeno["Korekcija vrijednosti (%)"] / 100.0)
+                
                 df_dodijeljeno["Koeficijent"] = df_dodijeljeno["Zona"].apply(dohvati_koef_iz_baze)
-                df_dodijeljeno["Vrijednosni bodovi"] = df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"]
+                df_dodijeljeno["Vrijednosni bodovi"] = df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"] * df_dodijeljeno["Faktor Korekcije"]
+
 
                
                 # =========================================================================
@@ -469,8 +442,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 else:
                     statistika["Udio u vrijednosti imanja"] = 0.0
 
-                # 🔥 PRAVILAN OBRAČUN DECIMALA ZA UKUPNO: 
-                # Ako je podijeljeno cijelo imanje, zbroj zaokružujemo na čistih 100.00 %
                 sirovi_zbroj_posto = statistika["Udio u vrijednosti imanja"].sum()
                 if 99.5 <= sirovi_zbroj_posto <= 100.5:
                     ukupno_posto = 100.00
@@ -515,8 +486,6 @@ def prikazi_ekran_administracije(cursor, conn):
                     }
                 )
 
-                
-                # 🔥 POPRAVLJENO: Dinamički ispis točnih koeficijenata iz baze u samu napomenu (0% kvačica)
                 stavke_sifrarnika = []
                 for oznaka, koef in koeficijenti_baza.items():
                     if oznaka != "-":  # Preskačemo sigurnosni default u popisu
@@ -525,8 +494,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 popis_zona_tekst = ", ".join(stavke_sifrarnika)
                 
                 st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine s koeficijentom zone iz šifrarnika koji se trenutno primjenjuje za ovaj obračun: {popis_zona_tekst}. Kod čestica koje se protežu kroz više zona (kombinirane zone), sustav automatski prepoznaje sve navedene zone, ali obračun bodova temelji na koeficijentu najvrjednije priznate zone u toj kombinaciji. Time se vrijednost preostalih, manje vrijednih dijelova čestice u konačnom izračunu smanjuje u korist dominantne ekonomske cjeline.*")
-
-               # st.caption("💡 *Napomena: Vrijednosni bodovi se računaju množenjem površine s koeficijentom zone iz šifrarnika baze podataka (DBeaver). Za kombinirane zone sustav automatski uzima koeficijent najvrjednije priznate zone u kombinaciji.*")
             else:
                 st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
 

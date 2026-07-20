@@ -69,18 +69,9 @@ def prikazi_ekran_nasljednika(cursor, conn):
 
     # 3. DOHVAĆANJE TRENUTNO OZNAČENIH ČESTICA IZ BAZE 
     cursor.execute("SELECT id_cestice, status_diobe FROM dioba_cestica")
-    #stanja_iz_baze = {int(red[0]): str(red[1]).strip() for red in cursor.fetchall() if red}
-        # 🔥 POPRAVLJENO: Točno izvlačimo ID (indeks 0) i stvarni status (indeks 1) iz baze podataka
     stanja_iz_baze = {int(red[0]): str(red[1]).strip() for red in cursor.fetchall() if red and red[0] is not None and red[1] is not None}
 
     trenutno_oznacene_ids = set(stanja_iz_baze.keys())
-
-
-    trenutno_oznacene_ids = set(stanja_iz_baze.keys())
-    #"Odaberi": True if status_c == "Dodijeljeno" else (cid in trenutno_oznacene_ids),
-
-
-
 
     # 4. Priprema konfiguracije stupaca i dinamickog popisa za zakljucavanje
     konfiguracija_kolona = {
@@ -118,12 +109,6 @@ def prikazi_ekran_nasljednika(cursor, conn):
             "Površina (m2)": float(povrsina) if povrsina else 0.0,
             "SKRIVENI_ID": cid
         })        
-
-
-                # 🔥 PROVJERENO PORAVNANJE NA KRAJU PETLJE (0% kvacica)
-        #status_cisti = str(status_trenutni).strip().upper() if status_trenutni else ""
-        
-               # 🔥 POPRAVLJENO: Sve cestice inicijalno punimo u slobodni popis (0% kvacica)
         podaci_slobodno.append(podaci_za_tablicu[-1])
 
 
@@ -139,7 +124,6 @@ def prikazi_ekran_nasljednika(cursor, conn):
 
 
     # 5. TABLICA S INSTANT OKIDAČEM PROMJENA (Bez rušenja Fullscreen prikaza)
-        # ZADNJI KORAK: Ugradnja tabova i razdvajanje prikaza (0% kvacica)
     tab_slobodno, tab_dodijeljeno = st.tabs(["👥 Slobodne čestice za odabir", "🔒 Dodijeljene čestice"])
 
     with tab_slobodno:
@@ -161,7 +145,6 @@ def prikazi_ekran_nasljednika(cursor, conn):
         )
 
     with tab_dodijeljeno:
-        # 🔥 POPRAVLJENO: Drugi tab sam iz baze cupa iskljucivo sluzbeno dodijeljene parcele!
         cursor.execute("""
             SELECT c.broj_cestice, c.zk_ulozak, p.naziv_podrucja, c.oznaka_zemljista, c.naziv_zemljista, c.povrsina, dc.nasljednik
             FROM dioba_cestica dc
