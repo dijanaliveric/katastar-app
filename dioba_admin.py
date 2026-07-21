@@ -1,7 +1,9 @@
 import streamlit as st
 import pandas as pd
+import json
 import psycopg2
 from zoneinfo import ZoneInfo
+
 
     # =========================================================================
     # ⚖️ KUTAK ZA ADMINA I ODVJETNIKA (MINIMALISTIČKA DODJELA)
@@ -331,11 +333,14 @@ def prikazi_ekran_administracije(cursor, conn):
                         promjene_odvjetnika += 1
 
                 if promjene_odvjetnika > 0:
-                    conn.commit()
-                    st.success(f"⚖️ Raspodjela uspješno spremljena! Zabilježeno je {promjene_odvjetnika} novih odluka.")
-                    st.rerun()
+
+                        conn.commit()
+
+                        st.success(f"⚖️ Raspodjela uspješno spremljena i sinkronizirana s mobitelima!")
+                        st.rerun()
                 else:
                     st.info("Nema novih izmjena u raspodjeli za spremiti.")
+
 
             # =========================================================================
             # 📊 UNIVERZALNI SUSTAV PREKO ŠIFRARNIKA ZONA 
@@ -347,16 +352,11 @@ def prikazi_ekran_administracije(cursor, conn):
             # 1. Povlačimo sve zone i koeficijente uživo iz baze podataka (Nema try-except skrivača)
             cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM sifrarnik_zona")
             koeficijenti_baza = {str(zona).strip().upper(): float(koef) for zona, koef in cursor.fetchall()}
-
-                        # 🔥 POPRAVLJENO: Strogi filtar koji u sekundi briše ljude iz donje tablice na reset (0% kvačica)
             df_dodijeljeno = uredjeni_df_odvjetnik[
                 (uredjeni_df_odvjetnik["Status"] == "Dodijeljeno") & 
                 (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].notna()) &
                 (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].str.strip() != "")
             ].copy()
-
-            
-
 
             if not df_dodijeljeno.empty:
                 def dohvati_koef_iz_baze(zona_tekst):
@@ -366,8 +366,6 @@ def prikazi_ekran_administracije(cursor, conn):
                         return sigurnosni_default
                         
                     zona_cista = str(zona_tekst).strip().upper()
-                    
-                    # KORAK A: Točno poklapanje cijele tekstualne kombinacije iz baze
                     if zona_cista in koeficijenti_baza:
                         return koeficijenti_baza[zona_cista]
                         
@@ -379,50 +377,33 @@ def prikazi_ekran_administracije(cursor, conn):
                         for p_zona in pojedinacne_zone:
                             if p_zona == kljuc_baza or kljuc_baza in p_zona:
                                 pronadjeni_koeficijenti.append(koef_vrijednost)
-                                
-                    # Uzimamo najveći koeficijent iz kombinacije (dominantna vrijednost u praksi)
                     if pronadjeni_koeficijenti:
                         return max(pronadjeni_koeficijenti)
                         
-                    # KORAK C: Ako baš ništa iz kombinacije nije prepoznato u šifrarniku
                     return sigurnosni_default
                 df_dodijeljeno["Faktor Korekcije"] = 1.0 + (df_dodijeljeno["Korekcija vrijednosti (%)"] / 100.0)
                 
                 df_dodijeljeno["Koeficijent"] = df_dodijeljeno["Zona"].apply(dohvati_koef_iz_baze)
                 df_dodijeljeno["Vrijednosni bodovi"] = df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"] * df_dodijeljeno["Faktor Korekcije"]
 
-
-               
-                # =========================================================================
-                # MATEMATIKA ZA SUVLASNIŠTVO 
-                # =========================================================================
-                
-                # 3. RAZBIJANJE SUVLASNIŠTVA I DIJELJENJE VRIJEDNOSTI NA JEDNAKE DIJELOVE
                 razbijeni_podaci = []
                 
                 for _, red in df_dodijeljeno.iterrows():
                     nasl_tekst = red["Kome pripada (Nasljednik)"]
                     povrsina = float(red.get("Površina (m²)", 0))
                     bodovi = float(red.get("Vrijednosni bodovi", 0))
-                    
-                    # Razbijamo tekst po zarezu i čistimo prazne razmake oko imena
                     svi_nasljednici = [n.strip() for n in str(nasl_tekst).split(",") if n.strip()]
                     broj_suvlasnika = len(svi_nasljednici)
                     
                     if broj_suvlasnika > 0:
-                        # Idealni dio: dijelimo površinu i bodove čestice na broj suvlasnika
                         povrsina_po_osobi = povrsina / broj_suvlasnika
                         bodovi_po_osobi = bodovi / broj_suvlasnika
-                        
-                        # Svakom suvlasniku zasebno pridružujemo njegov pripadajući dio
                         for ime in svi_nasljednici:
                             razbijeni_podaci.append({
                                 "Kome pripada (Nasljednik)": ime,
                                 "Površina (m²)": povrsina_po_osobi,
                                 "Vrijednosni bodovi": bodovi_po_osobi
                             })
-                
-                # Pretvaramo u novi DataFrame i sada radimo čisto i sigurno grupiranje po pojedinačnim ljudima
                 if razbijeni_podaci:
                     df_razbijeno = pd.DataFrame(razbijeni_podaci)
                     statistika = df_razbijeno.groupby("Kome pripada (Nasljednik)").agg({
@@ -430,13 +411,10 @@ def prikazi_ekran_administracije(cursor, conn):
                         "Vrijednosni bodovi": "sum"
                     }).reset_index()
                 else:
-                    # Ako nema podataka, stvaramo praznu strukturu da se kôd ispod ne sruši
                     statistika = pd.DataFrame(columns=["Kome pripada (Nasljednik)", "Površina (m²)", "Vrijednosni bodovi"])
 
                 ukupno_m2 = statistika["Površina (m²)"].sum()
                 ukupno_bodova = statistika["Vrijednosni bodovi"].sum()
-
-                # Računamo postotni udio na dvije decimale radi maksimalne preciznosti
                 if ukupno_bodova > 0:
                     statistika["Udio u vrijednosti imanja"] = (statistika["Vrijednosni bodovi"] / ukupno_bodova * 100).round(2)
                 else:
@@ -448,13 +426,10 @@ def prikazi_ekran_administracije(cursor, conn):
                 else:
                     ukupno_posto = round(sirovi_zbroj_posto, 2)
 
-
-                # 4. FORMATIRANJE STUPACA NA 2 DECIMALE I DODAVANJE OZNAKE %
                 statistika["Ukupna stvarna površina"] = statistika["Površina (m²)"].apply(lambda x: f"{int(x):,} m²".replace(",", " "))
                 statistika["Procijenjena vrijednost (Bodovi)"] = statistika["Vrijednosni bodovi"].apply(lambda x: f"{int(x):,}".replace(",", " ")) # 🔥 Popravljen krivi format specifier
                 statistika["Udio u vrijednosti imanja (%)"] = statistika["Udio u vrijednosti imanja"].apply(lambda x: f"{x:.2f} %")
 
-                # Selektiramo i preimenujemo stupce za konačni dataframe prikaz
                 tablica_prikaz = statistika[[
                     "Kome pripada (Nasljednik)", 
                     "Ukupna stvarna površina", 
@@ -463,7 +438,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 ]]
                 tablica_prikaz.columns = ["Nasljednik / Obiteljska grana", "Ukupna stvarna površina", "Procijenjena vrijednost (Bodovi)", "Udio u vrijednosti imanja (%)"]
 
-                # 5. STVARANJE REDKA S UKUPNIM ZBROJEM 
                 red_ukupno = pd.DataFrame([{
                     "Nasljednik / Obiteljska grana": "═══ 🛑 UKUPNO PODIJELJENO ═══",
                     "Ukupna stvarna površina": f"📊 {int(ukupno_m2):,} m²".replace(",", " "),
@@ -472,9 +446,6 @@ def prikazi_ekran_administracije(cursor, conn):
                 }])
 
                 konacni_df_prikaz = pd.concat([tablica_prikaz, red_ukupno], ignore_index=True)
-
-                           
-                # 6. Desno poravnanje podataka
                 st.dataframe(
                     konacni_df_prikaz, 
                     hide_index=True, 
@@ -492,6 +463,60 @@ def prikazi_ekran_administracije(cursor, conn):
                         stavke_sifrarnika.append(f"**{oznaka}** ({koef:.2f})")
                 
                 popis_zona_tekst = ", ".join(stavke_sifrarnika)
+
+
+                                # =========================================================================
+                # 📊 SINKRONIZACIJA: Slanje Vaših stopostotno točnih brojki na mobitele
+                # =========================================================================
+                try:
+                    import json
+
+                    # Računamo točan postotak riješenosti: koliko čestica NIJE u statusu 'Interes'
+                    uk_komada = len(uredjeni_df_odvjetnik) if len(uredjeni_df_odvjetnik) > 0 else 1
+                    rijeseno_komada = len(uredjeni_df_odvjetnik[uredjeni_df_odvjetnik["Status"] != "Interes"])
+                    postotak_rjesenja = (rijeseno_komada / uk_komada) * 100
+                    preostalo_cestica = len(uredjeni_df_odvjetnik[uredjeni_df_odvjetnik["Status"] == "Interes"])
+
+                    # Pakiramo Vašu 'statistika' tablicu s točnim imenima i postocima od 100%
+                    podaci_lista = []
+                    for _, red_s in statistika.iterrows():
+                        podaci_lista.append({
+                            "Nasljednik": str(red_s["Kome pripada (Nasljednik)"]),
+                            "Povrsina": float(red_s["Površina (m²)"]),
+                            "Bodovi": float(red_s["Vrijednosni bodovi"]),
+                            "Udio": float(red_s["Udio u vrijednosti imanja"])
+                        })
+
+                    json_nasljednici = json.dumps(podaci_lista)
+
+                    # Osiguravamo samo postojanje tablice za mobitele na cloudu
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS public.live_statistika_diobe (
+                            id int PRIMARY KEY,
+                            postotak numeric,
+                            bodovi numeric,
+                            povrsina numeric,
+                            preostalo int,
+                            tablica_nasljednika text
+                        );
+                    """)
+
+                    # Upisujemo Vaše gotove, preračunate brojke u bazu
+                    cursor.execute("""
+                        INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo, tablica_nasljednika)
+                        VALUES (1, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO UPDATE SET 
+                            postotak = EXCLUDED.postotak,
+                            bodovi = EXCLUDED.bodovi,
+                            povrsina = EXCLUDED.povrsina,
+                            preostalo = EXCLUDED.preostalo,
+                            tablica_nasljednika = EXCLUDED.tablica_nasljednika;
+                    """, (float(postotak_rjesenja), float(ukupno_bodova), float(ukupno_m2), int(preostalo_cestica), json_nasljednici))
+                    conn.commit()
+
+                except Exception as e:
+                    st.sidebar.error(f"Pomoćni mobilni sinkronizator: {e}")
+
                 
                 st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine s koeficijentom zone iz šifrarnika koji se trenutno primjenjuje za ovaj obračun: {popis_zona_tekst}. Kod čestica koje se protežu kroz više zona (kombinirane zone), sustav automatski prepoznaje sve navedene zone, ali obračun bodova temelji na koeficijentu najvrjednije priznate zone u toj kombinaciji. Time se vrijednost preostalih, manje vrijednih dijelova čestice u konačnom izračunu smanjuje u korist dominantne ekonomske cjeline.*")
             else:

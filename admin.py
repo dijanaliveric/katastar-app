@@ -16,14 +16,6 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-# Osiguravamo tablice i polja u bazi podataka na internetu
-try:
-    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS katastarska_opcina TEXT;")
-    conn.commit()
-except Exception:
-    if conn: conn.rollback()
-
-
 # --- JEDNOSTAVNA ZAŠTITA ZA ULAZ U APLIKACIJU ---# --- JEDNOSTAVNA ZAŠTITA ZA ULAZ IN ADMIN PANEL ---
 if "admin_autentificiran" not in st.session_state:
     st.session_state["admin_autentificiran"] = False
@@ -52,41 +44,6 @@ if not st.session_state["admin_autentificiran"]:
 
 st.set_page_config(page_title="Katastar - Administracija", layout="wide")
 st.title("🔐 Kontrolna Ploča (Upravljanje Podacima)")
-
-
-
-import psycopg2
-import streamlit as st
-conn = psycopg2.connect(
-    host=st.secrets["baza"]["host"],
-    port=st.secrets["baza"]["port"],
-    database=st.secrets["baza"]["database"],
-    user=st.secrets["baza"]["user"],
-    password=st.secrets["baza"]["password"],
-    sslmode=st.secrets["baza"]["sslmode"]
-)
-cursor = conn.cursor()
-
-
-
-# Osiguravamo da tablice imaju potrebna polja na internetu
-try:
-    cursor.execute("ALTER TABLE povijest_dokumenata ADD COLUMN IF NOT EXISTS datoteka TEXT;")
-    conn.commit()
-except:
-    if conn: conn.rollback()
-
-try:
-    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS katastarska_opcina TEXT;")
-    conn.commit()
-except:
-    if conn: conn.rollback()
-
-try:
-    cursor.execute("ALTER TABLE cestice ADD COLUMN IF NOT EXISTS sifra TEXT;")
-    conn.commit()
-except:
-    if conn: conn.rollback()
 
 
 # Dohvat podrucja
@@ -130,6 +87,5 @@ with tab_glavni3:
     prikazi_brisanje(conn, cursor, c_glavni_dict)
 
 conn.close()
-
 
 

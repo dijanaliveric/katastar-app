@@ -121,7 +121,7 @@ with glavni_col1:
             odabrana_zona = st.pills("Zona:", sve_zone, default="Sve zone", key="zona_filter")
             
 
-            with st.popover("📖 Legenda - zone", use_container_width=True):
+            with st.popover("📖 Legenda - zone", width='stretch'):
                 st.markdown("""
             **Službena značenja oznaka (Grad Obrovac):**
             
@@ -168,6 +168,9 @@ with glavni_col1:
 with glavni_col2:
     if izbor == "🗺️ Pregled i pretraga čestica":    
         st.title("🗺️ Obiteljska Arhiva Katastra")
+        # 📌 Rezerviramo prazan prostor na vrhu ekrana za mobilnu live karticu
+        prostor_za_live_karticu = st.container()
+
         if "uploader_kljuc" not in st.session_state: st.session_state["uploader_kljuc"] = 0
         up_doc = st.file_uploader("Učitaj novi dokument:", type=["png", "jpg", "jpeg", "pdf", "xlsx"], key=f"up_{st.session_state['uploader_kljuc']}")
 
@@ -262,7 +265,7 @@ with glavni_col2:
                 with st.expander(f"📄 {v} br. {br} ({st_g})"):
                     st.write(f"👤 {vl} | 💬 {p_n}")
                     
-                    if st.button("👁️ Prikaži / Otvori dokument", key=f"btn_c_{dat}", use_container_width=True):
+                    if st.button("👁️ Prikaži / Otvori dokument", key=f"btn_c_{dat}", width='stretch'):
                         with st.spinner("⏳ Dohvaćam dokument iz arhive..."):
                             
                             # 1. ČISTI SQL TRIK: Izvlačimo dio iza '|||' i dekodiramo Base64 izravno na Postgres serveru!
@@ -296,7 +299,7 @@ with glavni_col2:
                                     binarni, 
                                     file_name=ime, 
                                     mime="application/pdf", 
-                                    use_container_width=True
+                                    width='stretch'
                                 )
                         else:
                             st.error("❌ Greška: Datoteka ne postoji ili format nije ispravan.")
@@ -370,6 +373,101 @@ with glavni_col2:
             }
             df = df.rename(columns=preimenovani_stupci)
             
+        # =========================================================================
+        # 📱 LIVE STATISTIKA ZA MOBITELE OBITELJI - FOKUS NA IMENA I POJEDINAČNE REZULTATE
+        # =========================================================================
+        import pandas as pd
+        import json
+
+        try:
+            # Povlačimo gotovu statistiku iz baze u 0.001 sekundi
+            cursor.execute("SELECT postotak, bodovi, povrsina, preostalo, tablica_nasljednika FROM public.live_statistika_diobe WHERE id = 1")
+            statistika_baza = cursor.fetchone()
+            
+            if statistika_baza:
+                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = statistika_baza
+                postotak_top = float(postotak_top)
+            else:
+                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+        except Exception:
+            postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+
+        # 1. DEFINICIJA SKOČNOG PROZORA ZA MOBITEL
+        @st.dialog("📊 Pregled raspodjele po nasljedniku", width="small")
+        def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
+            # Traka ukupnog napretka cijelog imanja na vrhu prozora
+            st.progress(min(max(float(p_top) / 100, 0.0), 1.0), text=f"Dodijeljeno: {p_top:.1f}% imovine")
+            st.write("") 
+            
+            # 🔥 FOKUS: ODMAH PRIKAZUJEMO REZULTATE PO SVAKOM POJEDINAČNOM NASLJEDNIKU
+            st.markdown("### 👥 Ostvareni bodovi i udjeli:")
+            if json_podaci:
+                try:
+                    podaci_lista = json.loads(json_podaci)
+                    df_nasljednici = pd.DataFrame(podaci_lista)
+                    
+                    if not df_nasljednici.empty:
+                        df_nasljednici.columns = ["Nasljednik", "Površina", "Bodovi", "Udio (%)"]
+                        
+                        # 🔥 POPRAVLJENO: Pametno rezanje koje prepoznaje sve vrste strelica, krtica i oznaka
+                        def napredno_skrati_ime(ime_tekst):
+                            ime_str = str(ime_tekst).strip()
+                            
+                            # 1. Ako sadrži bilo koju vrstu strelice, uzmi zadnji dio
+                            for separator in ["-->", "—>", "->", ">", "═>", "=>"]:
+                                if separator in ime_str:
+                                    return ime_str.split(separator)[-1].strip()
+                                    
+                            # 2. Ako nema strelicu, ali ima kosu crtu ili dvotočku (npr. Raspodjela: Ivan)
+                            for separator in [" / ", ": "]:
+                                if separator in ime_str:
+                                    return ime_str.split(separator)[-1].strip()
+                                    
+                            return ime_str
+
+                        df_nasljednici["Nasljednik"] = df_nasljednici["Nasljednik"].apply(napredno_skrati_ime)
+                        
+                        # Fino formatiranje za maksimalnu čitljivost na mobitelu
+                        df_nasljednici["Površina"] = df_nasljednici["Površina"].apply(lambda x: f"{int(x):,}".replace(",", " ") + " m²")
+                        df_nasljednici["Bodovi"] = df_nasljednici["Bodovi"].apply(lambda x: f"{float(x):,.2f}".replace(",", " ") + " bod")
+                        df_nasljednici["Udio (%)"] = df_nasljednici["Udio (%)"].apply(lambda x: f"{float(x):.2f} %")
+                        
+                        # Čisti prikaz preko cijele širine mobilnog zaslona uz width='stretch'
+                        st.dataframe(df_nasljednici, hide_index=True, width='stretch')
+                    else:
+                        st.info("Još nema dodijeljenih čestica po nasljednicima.")
+                except Exception:
+                        st.error("Nije moguće generirati tablicu nasljednika.")
+            else:
+                st.info("Čeka se prvi odvjetnički izračun raspodjele.")
+                
+            st.divider()
+            
+            # ⬇️ DISKRETNE BROJKE NA DNU (Spuštene i potpuno neistaknute)
+            col_dolje1, col_dolje2 = st.columns(2)
+            with col_dolje1:
+                st.caption(f"📐 Ukupna kvadratura: **{int(p_dod):,}".replace(",", " ") + " m²**")
+            with col_dolje2:
+                st.caption(f"📋 Preostalo: **{preostalo} čestica**")
+
+                # --- Ovdje završava Vaš postojeći kôd tablice i ukupne površine ---
+        # st.dataframe(df, width='stretch', hide_index=True)
+        # st.write("---")
+
+        # =========================================================================
+        # 📱 2. REZERVIRANI KONTEJNER NA VRHU - DECENTAN I ELEGANTAN MOBILNI DIZAJN
+        # =========================================================================
+        with prostor_za_live_karticu:
+            if st.button(f"📊 Rezultati diobe ({postotak_top:.1f}% riješeno)", key="btn_obitelj_card_top_database_clean", width='stretch'):
+                prikazi_live_rezultate_mobilni_brzi(postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici)
+
+            # Diskretna, tanka vodoravna traka koja vizualno prati napredak odmah ispod gumba
+            procent_za_mini_bar = min(max(float(postotak_top) / 100, 0.0), 1.0)
+            st.progress(procent_za_mini_bar)
+            
+            st.write("") # Mali, fini razmak do glavne tablice
+
+###################################################################################
             # Prikaz tablice s otključanom analitikom na desni klik
             st.dataframe(df, width='stretch', hide_index=True)
         
@@ -427,7 +525,7 @@ with glavni_col2:
                     if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         st.image(binarni_podaci, width='stretch')
-                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_pl_img_{odabrani_id}")
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", width='stretch', key=f"dl_pl_img_{odabrani_id}")
                     
                                         # B. Ako je datoteka PDF (Učitavanje prve stranice iz liste + gumb)
                     elif naziv_datoteke.lower().endswith('.pdf'):
@@ -447,10 +545,10 @@ with glavni_col2:
                                 st.image(cista_slika, width='stretch')
                                 
                                 # Gumb za preuzimanje kompletnog PDF-a
-                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_pdf_ok_{odabrani_id}")
+                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_pdf_ok_{odabrani_id}")
                         except Exception as e:
                             st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
-                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_pdf_err_{odabrani_id}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_pdf_err_{odabrani_id}")
         else: 
             st.info("Nema dokumenata u bazi.")
 
@@ -489,7 +587,7 @@ with glavni_col2:
                     if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         st.image(binarni_podaci, width='stretch')  # 🔥 PAŽLJIVO UKLJUČEN width='stretch'
-                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_mat_img_{odabrani_id}")
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", width='stretch', key=f"dl_mat_img_{odabrani_id}")
                     
                     # B. Ako je datoteka PDF (Uzimamo prvu stranicu iz liste i crtamo je kao sliku)
                     elif naziv_datoteke.lower().endswith('.pdf'):
@@ -510,10 +608,10 @@ with glavni_col2:
                                 st.image(cista_slika, width='stretch')  # 🔥 PAŽLJIVO UKLJUČEN width='stretch'
                                 
                                 # Gumb za preuzimanje cijelog PDF dokumenta
-                                st.download_button(label="📥 Preuzmi cijelu matičnu knjigu (PDF)", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_mat_pdf_{odabrani_id}")
+                                st.download_button(label="📥 Preuzmi cijelu matičnu knjigu (PDF)", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_mat_pdf_{odabrani_id}")
                         except Exception as e:
                             st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
-                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_mat_err_{odabrani_id}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_mat_err_{odabrani_id}")
         else: 
             st.info("Nema matičnih knjiga u bazi.")
 
@@ -553,7 +651,7 @@ with glavni_col2:
                     if naziv_datoteke.lower().endswith(('.jpg', '.jpeg', '.png')):
                         st.html("<style>div[data-testid='stImage'] img {pointer-events: none !important;}</style>")
                         st.image(binarni_podaci, width='stretch')
-                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", use_container_width=True, key=f"dl_doc_img_{odabrani_id}")
+                        st.download_button(label="📥 Preuzmi ovu sliku", data=binarni_podaci, file_name=naziv_datoteke, mime="image/jpeg", width='stretch', key=f"dl_doc_img_{odabrani_id}")
                     
                     # B. Ako je datoteka PDF (Uzimamo prvu stranicu iz liste [0] i crtamo je kao sliku)
                     elif naziv_datoteke.lower().endswith('.pdf'):
@@ -573,14 +671,14 @@ with glavni_col2:
                                 st.image(cista_slika, width='stretch')
                                 
                                 # Gumb za preuzimanje cijelog PDF dokumenta
-                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_doc_pdf_{odabrani_id}")
+                                st.download_button(label="📥 Preuzmi cijeli PDF dokument", data=binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_doc_pdf_{odabrani_id}")
                         except Exception as e:
                             st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
-                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", use_container_width=True, key=f"dl_doc_err_{odabrani_id}")
+                            st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_doc_err_{odabrani_id}")
                     
                     # C. Prikaz Office dokumenata (Excel, Word)
                     elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
-                        st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=binarni_podaci, file_name=naziv_datoteke, key=f"dl_office_{odabrani_id}", use_container_width=True)
+                        st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=binarni_podaci, file_name=naziv_datoteke, key=f"dl_office_{odabrani_id}", width='stretch')
         else: 
             st.info("Nema dokumenata.")
 

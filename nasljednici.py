@@ -38,6 +38,47 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
         if broj_promjena > 0:
             conn.commit()
       
+        # =========================================================================
+        # 🚀 TRENUTNI REFRESH STATISTIKE: Okida se čim rodbina klikne kvačicu
+        # =========================================================================
+        try:
+            # 1. Računamo ukupni broj čestica i broj onih koje više NISU u statusu 'Interes'
+            cursor.execute("SELECT COUNT(*) FROM public.dioba_cestica")
+            uk_komada = cursor.fetchone()[0]
+            uk_komada = int(uk_komada) if uk_komada and uk_komada > 0 else 1
+
+            cursor.execute("SELECT COUNT(*) FROM public.dioba_cestica WHERE status_diobe != 'Interes'")
+            rijeseno_komada = cursor.fetchone()[0]
+            rijeseno_komada = int(rijeseno_komada) if rijeseno_komada else 0
+            
+            postotak_rjesenja = (rijeseno_komada / uk_komada) * 100
+            preostalo_cestica = uk_komada - rijeseno_komada
+
+            # 2. Povlačimo trenutno stanje ukupnih površina i bodova već dodijeljenih čestica iz baze
+            cursor.execute("""
+                SELECT 
+                    COALESCE(SUM(c.povrsina), 0) as dod_pov,
+                    COALESCE(SUM(c.povrsina * (1 + (COALESCE(d.korekcija_postotak, 0) / 100.0))), 0) as dod_bod
+                FROM public.cestice c
+                JOIN public.dioba_cestica d ON c.id = d.id_cestice
+                WHERE d.status_diobe != 'Interes' AND d.nasljednik IS NOT NULL AND d.nasljednik != ''
+            """)
+            ukupno_p_live, ukupno_b_live = cursor.fetchone()
+
+            # 3. Samo ažuriramo glavne brojke na cloudu, a tablicu nasljednika ostavljamo netaknutom
+            cursor.execute("""
+                INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo)
+                VALUES (1, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE SET 
+                    postotak = EXCLUDED.postotak,
+                    bodovi = EXCLUDED.bodovi,
+                    povrsina = EXCLUDED.povrsina,
+                    preostalo = EXCLUDED.preostalo;
+            """, (float(postotak_rjesenja), float(ukupno_b_live), float(ukupno_p_live), int(preostalo_cestica)))
+            conn.commit()
+            
+        except Exception:
+            pass # Osiguravamo da privremeni proračun nikada ne sruši klik rodbine ako mreža trzne
 
 def prikazi_ekran_nasljednika(cursor, conn):
     st.title("👥 Iskazivanje interesa za čestice")
