@@ -309,10 +309,25 @@ def prikazi_ekran_administracije(cursor, conn):
                 for indeks_red, redak in uredjeni_df_odvjetnik.iterrows():
                     cid = int(redak["ID Čestice"])
                     broj = str(redak["Broj čestice"])
-                    novi_nasljednik = str(redak["Kome pripada (Nasljednik)"]).strip()
-                    novi_status = str(redak["Status"])
-                    stara_stavka = [x for x in poklikane_cestice if x[0] == cid]
                     
+                    # 🛠️ 1. SIGURNOSNI FILTER: Izvlačimo sirovi tekst i uništavamo Pandas 'nan' oblike
+                    novi_nasljednik_sirovo = str(redak["Kome pripada (Nasljednik)"]).strip()
+                    novi_status_sirovo = str(redak["Status"]).strip()
+
+                    # Ako je ćelija ispražnjena ili doslovno piše 'nan' / 'None', čistimo je na prazan string
+                    if not novi_nasljednik_sirovo or novi_nasljednik_sirovo.lower() in ["nan", "none", "null", ""]:
+                        novi_nasljednik = ""
+                    else:
+                        novi_nasljednik = novi_nasljednik_sirovo
+
+                    # Ako je status obrisan, automatski ga vraćamo na početni 'Interes'
+                    if not novi_status_sirovo or novi_status_sirovo.lower() in ["nan", "none", "null", ""]:
+                        novi_status = "Interes"
+                    else:
+                        novi_status = novi_status_sirovo
+
+                    # Dohvaćamo staro stanje radi usporedbe
+                    stara_stavka = [x for x in poklikane_cestice if x[0] == cid]
                     if stara_stavka:
                         stari_nasljednik = stara_stavka[0][5] if stara_stavka[0][5] else ""
                         stari_status = stara_stavka[0][6] if stara_stavka[0][6] else "Interes"
@@ -320,14 +335,14 @@ def prikazi_ekran_administracije(cursor, conn):
                         stari_nasljednik = ""
                         stari_status = "Interes"
 
-                    # Uspoređujemo je li korisnik stvarno napravio izmjenu na ekranu
+                    # 🛠️ 2. USPOREDBA I SIGURAN UPIS (U bazu ide čisti SQL NULL ako nema nasljednika)
                     if novi_nasljednik != stari_nasljednik or novi_status != stari_status:
                         vrijednost_baza = novi_nasljednik if novi_nasljednik != "" else None
                         
-                        # 1. Ažuriramo trenutno stanje diobe
+                        # 1. Ažuriramo trenutno stanje diobe u bazi podataka
                         cursor.execute("UPDATE dioba_cestica SET nasljednik = %s, status_diobe = %s WHERE id_cestice = %s", (vrijednost_baza, novi_status, cid))
                         
-                        # 2. Upisujemo u log dugački tekst (Sada prolazi jer je polje akcija u bazi VARCHAR(255)!)
+                        # 2. Upisujemo u log dugački tekst (Ako je nasljednik ispražnjen, log bilježi RESETIRANO)
                         akcija_log = f"DODIJELJENO ({novi_nasljednik})" if novi_nasljednik != "" else "RESETIRANO"
                         cursor.execute("INSERT INTO log_diobe_cestica (id_cestice, broj_cestice, akcija, ip_adresa) VALUES (%s, %s, %s, %s)", (cid, broj, akcija_log, ip_adresa))
                         promjene_odvjetnika += 1
