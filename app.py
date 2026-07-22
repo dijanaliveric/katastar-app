@@ -416,7 +416,7 @@ with glavni_col2:
         def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
             
             # Traka ukupnog napretka na samom vrhu prozora
-            st.progress(min(max(float(p_top) / 100, 0.0), 1.0), text=f"Dodijeljeno: {p_top:.1f}% komada čestica")
+            st.progress(min(max(float(p_top) / 100, 0.0), 1.0), text=f"Dodijeljeno: {p_top:.1f}% imovine")
             
             # Glavna tablica s nasljednicima
             st.markdown("### 👥 Ostvareni bodovi i udjeli:")
