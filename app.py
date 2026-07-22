@@ -52,25 +52,25 @@ if "odabrani_zk" not in st.session_state: st.session_state["odabrani_zk"] = "Svi
 if "odabrana_vrsta_lista" not in st.session_state: st.session_state["odabrana_vrsta_lista"] = "Sve vrste lista"
 
 
-# --- SPAJANJE NA Superbase ---
-# conn = psycopg2.connect(
-#     host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
-#     database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
-#     password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
-#     options="-c statement_timeout=5000"
-# )
-# cursor = conn.cursor()
-
-# ----- LOKALNO -----
+#--- SPAJANJE NA Superbase ---
 conn = psycopg2.connect(
-    host=st.secrets["lokalna_baza"]["host"], 
-    port=st.secrets["lokalna_baza"]["port"],
-    database=st.secrets["lokalna_baza"]["database"], 
-    user=st.secrets["lokalna_baza"]["user"],
-    password=st.secrets["lokalna_baza"]["password"],
+    host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
+    database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
+    password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
     options="-c statement_timeout=5000"
 )
 cursor = conn.cursor()
+
+# # ----- LOKALNO -----
+# conn = psycopg2.connect(
+#     host=st.secrets["lokalna_baza"]["host"], 
+#     port=st.secrets["lokalna_baza"]["port"],
+#     database=st.secrets["lokalna_baza"]["database"], 
+#     user=st.secrets["lokalna_baza"]["user"],
+#     password=st.secrets["lokalna_baza"]["password"],
+#     options="-c statement_timeout=5000"
+# )
+# cursor = conn.cursor()
 
 
 
