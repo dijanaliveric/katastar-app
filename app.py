@@ -412,7 +412,7 @@ with glavni_col2:
             postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
 
         # 🛠️ 1. POPUP PROZOR (Zadržana širina 'small' radi mobitela)
-        @st.dialog("📊 Živi rezultati diobe", width="small")
+        @st.dialog("📊 Rezultati diobe", width="small")
         def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
             
             # Traka ukupnog napretka na samom vrhu prozora
