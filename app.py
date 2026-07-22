@@ -393,7 +393,7 @@ with glavni_col2:
             postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
 
         # 1. DEFINICIJA SKOČNOG PROZORA ZA MOBITEL
-        @st.fragment(run_every=2)
+        #@st.fragment(run_every=2)
         @st.dialog("📊 Pregled raspodjele po nasljedniku", width="small")
         def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
             # Traka ukupnog napretka cijelog imanja na vrhu prozora
