@@ -348,11 +348,94 @@ def prikazi_ekran_administracije(cursor, conn):
                         promjene_odvjetnika += 1
 
                 if promjene_odvjetnika > 0:
+                    # =========================================================================
+                    # 🚀 POPRAVLJENO: Čisti zbroj bodova (Bez ikakvih množenja i zona)
+                    # =========================================================================
+                    try:
+                        import json
 
-                        conn.commit()
+                        df_live = uredjeni_df_odvjetnik.copy()
+                        
+                        c_povrsina = "Površina (m²)" if "Površina (m²)" in df_live.columns else "Površina (m2)"
+                        c_bodovi = "Bodovi" if "Bodovi" in df_live.columns else "Vrijednost (bodovi)"
+                        c_korekcija = "Korekcija vrijednosti (%)" if "Korekcija vrijednosti (%)" in df_live.columns else "Korekcija vrijednosti"
+                        c_nasljednik = "Kome pripada (Nasljednik)"
+                        c_status = "Status"
 
-                        st.success(f"⚖️ Raspodjela uspješno spremljena i sinkronizirana s mobitelima!")
-                        st.rerun()
+                        # 💎 Formula je čisti zbroj: Osnovni bodovi + Korekcija
+                        # Ako je osnovni broj bodova 2152, a korekcija -1000, rezultat je 1152!
+                        df_live["Vrijednosni bodovi"] = df_live[c_bodovi].fillna(0).astype(float) + df_live[c_korekcija].fillna(0).astype(float)
+
+                        uk_komada = len(df_live) if len(df_live) > 0 else 1
+                        rijeseno_komada = len(df_live[df_live[c_status] != "Interes"])
+                        postotak_rjesenja = (rijeseno_komada / uk_komada) * 100
+                        preostalo_cestica = len(df_live[df_live[c_status] == "Interes"])
+
+                        df_live_dodijeljeno = df_live[
+                            (df_live[c_status] == "Dodijeljeno") & 
+                            (df_live[c_nasljednik].notna()) &
+                            (df_live[c_nasljednik].astype(str).str.strip() != "")
+                        ]
+
+                        razbijeni_podaci = []
+                        for _, red in df_live_dodijeljeno.iterrows():
+                            nasl_tekst = red[c_nasljednik]
+                            povrsina = float(red.get(c_povrsina, 0))
+                            bodovi = float(red.get("Vrijednosni bodovi", 0))
+                            svi_nasljednici = [n.strip() for n in str(nasl_tekst).split(",") if n.strip()]
+                            broj_suvlasnika = len(svi_nasljednici)
+                            
+                            if broj_suvlasnika > 0:
+                                for ime in svi_nasljednici:
+                                    razbijeni_podaci.append({
+                                        "Nasljednik": ime,
+                                        "Povrsina": povrsina / broj_suvlasnika,
+                                        "Bodovi": bodovi / broj_suvlasnika
+                                    })
+
+                        if razbijeni_podaci:
+                            df_razbijeno = pd.DataFrame(razbijeni_podaci)
+                            statistika_live = df_razbijeno.groupby("Nasljednik").agg({
+                                "Povrsina": "sum",
+                                "Bodovi": "sum"
+                            }).reset_index()
+                            
+                            ukupno_m2_live = statistika_live["Povrsina"].sum()
+                            ukupno_bodova_live = statistika_live["Bodovi"].sum()
+                            statistika_live["Udio"] = (statistika_live["Bodovi"] / ukupno_bodova_live * 100).round(2) if ukupno_bodova_live > 0 else 0.0
+                            json_nasljednici = statistika_live.to_json(orient="records")
+                        else:
+                            ukupno_m2_live, ukupno_bodova_live = 0.0, 0.0
+                            json_nasljednici = json.dumps([])
+
+                        cursor.execute("""
+                            CREATE TABLE IF NOT EXISTS public.live_statistika_diobe (
+                                id int PRIMARY KEY,
+                                postotak numeric,
+                                bodovi numeric,
+                                povrsina numeric,
+                                preostalo int,
+                                tablica_nasljednika text
+                            );
+                        """)
+
+                        cursor.execute("""
+                            INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo, tablica_nasljednika)
+                            VALUES (1, %s, %s, %s, %s, %s)
+                            ON CONFLICT (id) DO UPDATE SET 
+                                postotak = EXCLUDED.postotak,
+                                bodovi = EXCLUDED.bodovi,
+                                povrsina = EXCLUDED.povrsina,
+                                preostalo = EXCLUDED.preostalo,
+                                tablica_nasljednika = EXCLUDED.tablica_nasljednika;
+                        """, (float(postotak_rjesenja), float(ukupno_bodova_live), float(ukupno_m2_live), int(preostalo_cestica), json_nasljednici))
+                        
+                    except Exception as e:
+                        st.sidebar.error(f"Usporenje sinkronizacije izbjegnuto: {e}")
+
+                    conn.commit()
+                    st.success(f"⚖️ Raspodjela uspješno spremljena!")
+                    st.rerun()
                 else:
                     st.info("Nema novih izmjena u raspodjeli za spremiti.")
 
@@ -399,7 +482,11 @@ def prikazi_ekran_administracije(cursor, conn):
                 df_dodijeljeno["Faktor Korekcije"] = 1.0 + (df_dodijeljeno["Korekcija vrijednosti (%)"] / 100.0)
                 
                 df_dodijeljeno["Koeficijent"] = df_dodijeljeno["Zona"].apply(dohvati_koef_iz_baze)
-                df_dodijeljeno["Vrijednosni bodovi"] = df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"] * df_dodijeljeno["Faktor Korekcije"]
+                
+                # Formula uzima osnovne bodove i na njih samo zbraja/oduzima upisani iznos
+                df_dodijeljeno["Vrijednosni bodovi"] = (df_dodijeljeno["Površina (m²)"] * df_dodijeljeno["Koeficijent"]) + df_dodijeljeno["Korekcija vrijednosti (%)"].fillna(0).astype(float)
+
+
 
                 razbijeni_podaci = []
                 

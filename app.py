@@ -4,6 +4,9 @@ import streamlit as st
 import base64
 import warnings
 import pandas as pd
+import nasljednici
+import dioba_admin
+
 
 # 1. POSTAVKE STRANICE
 st.set_page_config(page_title="Katastar Arhiva - Pregled", layout="wide")
@@ -50,24 +53,24 @@ if "odabrana_vrsta_lista" not in st.session_state: st.session_state["odabrana_vr
 
 
 # --- SPAJANJE NA Superbase ---
-conn = psycopg2.connect(
-    host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
-    database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
-    password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
-    options="-c statement_timeout=5000"
-)
-cursor = conn.cursor()
-
-# ----- LOKALNO -----
 # conn = psycopg2.connect(
-#     host=st.secrets["lokalna_baza"]["host"], 
-#     port=st.secrets["lokalna_baza"]["port"],
-#     database=st.secrets["lokalna_baza"]["database"], 
-#     user=st.secrets["lokalna_baza"]["user"],
-#     password=st.secrets["lokalna_baza"]["password"],
+#     host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
+#     database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
+#     password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
 #     options="-c statement_timeout=5000"
 # )
 # cursor = conn.cursor()
+
+# ----- LOKALNO -----
+conn = psycopg2.connect(
+    host=st.secrets["lokalna_baza"]["host"], 
+    port=st.secrets["lokalna_baza"]["port"],
+    database=st.secrets["lokalna_baza"]["database"], 
+    user=st.secrets["lokalna_baza"]["user"],
+    password=st.secrets["lokalna_baza"]["password"],
+    options="-c statement_timeout=5000"
+)
+cursor = conn.cursor()
 
 
 
@@ -77,7 +80,7 @@ cursor = conn.cursor()
 if "zadnji_odabir" not in st.session_state:
     st.session_state["zadnji_odabir"] = "🗺️ Pregled i pretraga čestica"
 
-# Prisluškujemo promjenu na radijskim gumbima navigacije
+#Prisluškujemo promjenu na radijskim gumbima navigacije
 if "navigacija_izbor" in st.session_state:
     trenutni_izbor = st.session_state["navigacija_izbor"]
     
@@ -372,101 +375,7 @@ with glavni_col2:
                 "povrsina": "Površina (m²)"
             }
             df = df.rename(columns=preimenovani_stupci)
-            
-        # =========================================================================
-        # 📱 LIVE STATISTIKA ZA MOBITELE OBITELJI - FOKUS NA IMENA I POJEDINAČNE REZULTATE
-        # =========================================================================
-        import pandas as pd
-        import json
 
-        try:
-            # Povlačimo gotovu statistiku iz baze u 0.001 sekundi
-            cursor.execute("SELECT postotak, bodovi, povrsina, preostalo, tablica_nasljednika FROM public.live_statistika_diobe WHERE id = 1")
-            statistika_baza = cursor.fetchone()
-            
-            if statistika_baza:
-                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = statistika_baza
-                postotak_top = float(postotak_top)
-            else:
-                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
-        except Exception:
-            postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
-
-        # 1. DEFINICIJA SKOČNOG PROZORA ZA MOBITEL
-        #@st.fragment(run_every=2)
-        @st.dialog("📊 Pregled raspodjele po nasljedniku", width="small")
-        def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
-            # Traka ukupnog napretka cijelog imanja na vrhu prozora
-            st.progress(min(max(float(p_top) / 100, 0.0), 1.0), text=f"Dodijeljeno: {p_top:.1f}% imovine")
-            st.write("") 
-            
-            # 🔥 FOKUS: ODMAH PRIKAZUJEMO REZULTATE PO SVAKOM POJEDINAČNOM NASLJEDNIKU
-            st.markdown("### 👥 Ostvareni bodovi i udjeli:")
-            if json_podaci:
-                try:
-                    podaci_lista = json.loads(json_podaci)
-                    df_nasljednici = pd.DataFrame(podaci_lista)
-                    
-                    if not df_nasljednici.empty:
-                        df_nasljednici.columns = ["Nasljednik", "Površina", "Bodovi", "Udio (%)"]
-                        
-                        # 🔥 POPRAVLJENO: Pametno rezanje koje prepoznaje sve vrste strelica, krtica i oznaka
-                        def napredno_skrati_ime(ime_tekst):
-                            ime_str = str(ime_tekst).strip()
-                            
-                            # 1. Ako sadrži bilo koju vrstu strelice, uzmi zadnji dio
-                            for separator in ["-->", "—>", "->", ">", "═>", "=>"]:
-                                if separator in ime_str:
-                                    return ime_str.split(separator)[-1].strip()
-                                    
-                            # 2. Ako nema strelicu, ali ima kosu crtu ili dvotočku (npr. Raspodjela: Ivan)
-                            for separator in [" / ", ": "]:
-                                if separator in ime_str:
-                                    return ime_str.split(separator)[-1].strip()
-                                    
-                            return ime_str
-
-                        df_nasljednici["Nasljednik"] = df_nasljednici["Nasljednik"].apply(napredno_skrati_ime)
-                        
-                        # Fino formatiranje za maksimalnu čitljivost na mobitelu
-                        df_nasljednici["Površina"] = df_nasljednici["Površina"].apply(lambda x: f"{int(x):,}".replace(",", " ") + " m²")
-                        df_nasljednici["Bodovi"] = df_nasljednici["Bodovi"].apply(lambda x: f"{float(x):,.2f}".replace(",", " ") + " bod")
-                        df_nasljednici["Udio (%)"] = df_nasljednici["Udio (%)"].apply(lambda x: f"{float(x):.2f} %")
-                        
-                        # Čisti prikaz preko cijele širine mobilnog zaslona uz width='stretch'
-                        st.dataframe(df_nasljednici, hide_index=True, width='stretch')
-                    else:
-                        st.info("Još nema dodijeljenih čestica po nasljednicima.")
-                except Exception:
-                        st.error("Nije moguće generirati tablicu nasljednika.")
-            else:
-                st.info("Čeka se prvi odvjetnički izračun raspodjele.")
-                
-            st.divider()
-            
-            # ⬇️ DISKRETNE BROJKE NA DNU (Spuštene i potpuno neistaknute)
-            col_dolje1, col_dolje2 = st.columns(2)
-            with col_dolje1:
-                st.caption(f"📐 Ukupna kvadratura: **{int(p_dod):,}".replace(",", " ") + " m²**")
-            with col_dolje2:
-                st.caption(f"📋 Preostalo: **{preostalo} čestica**")
-
-                # --- Ovdje završava Vaš postojeći kôd tablice i ukupne površine ---
-        # st.dataframe(df, width='stretch', hide_index=True)
-        # st.write("---")
-
-        # =========================================================================
-        # 📱 2. REZERVIRANI KONTEJNER NA VRHU - DECENTAN I ELEGANTAN MOBILNI DIZAJN
-        # =========================================================================
-        with prostor_za_live_karticu:
-            if st.button(f"📊 Rezultati diobe ({postotak_top:.1f}% riješeno)", key="btn_obitelj_card_top_database_clean", width='stretch'):
-                prikazi_live_rezultate_mobilni_brzi(postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici)
-
-            # Diskretna, tanka vodoravna traka koja vizualno prati napredak odmah ispod gumba
-            procent_za_mini_bar = min(max(float(postotak_top) / 100, 0.0), 1.0)
-            st.progress(procent_za_mini_bar)
-            
-            st.write("") # Mali, fini razmak do glavne tablice
 
 ###################################################################################
             # Prikaz tablice s otključanom analitikom na desni klik
@@ -483,7 +392,89 @@ with glavni_col2:
                       
             st.write("---")
     
+  
             
+               # =========================================================================
+        # 📱 LIVE STATISTIKA ZA MOBITELE OBITELJI - DECENTNA ZAOKRUŽENA VERZIJA
+        # =========================================================================
+        import pandas as pd
+        import json
+
+        try:
+            cursor.execute("SELECT postotak, bodovi, povrsina, preostalo, tablica_nasljednika FROM public.live_statistika_diobe WHERE id = 1")
+            statistika_baza = cursor.fetchone()
+            if statistika_baza:
+                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = statistika_baza
+                postotak_top = float(postotak_top)
+            else:
+                postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+        except Exception:
+            postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+
+        # 🛠️ 1. POPUP PROZOR (Zadržana širina 'small' radi mobitela)
+        @st.dialog("📊 Živi rezultati diobe", width="small")
+        def prikazi_live_rezultate_mobilni_brzi(p_top, b_dod, p_dod, preostalo, json_podaci):
+            
+            # Traka ukupnog napretka na samom vrhu prozora
+            st.progress(min(max(float(p_top) / 100, 0.0), 1.0), text=f"Dodijeljeno: {p_top:.1f}% komada čestica")
+            
+            # Glavna tablica s nasljednicima
+            st.markdown("### 👥 Ostvareni bodovi i udjeli:")
+            if json_podaci:
+                try:
+                    podaci_lista = json.loads(json_podaci)
+                    df_nasljednici = pd.DataFrame(podaci_lista)
+                    
+                    if not df_nasljednici.empty:
+                        df_nasljednici.columns = ["Nasljednik", "Površina", "Bodovi", "Udio (%)"]
+                        
+                        def napredno_skrati_ime(ime_tekst):
+                            ime_str = str(ime_tekst).strip()
+                            for separator in ["-->", "—>", "->", ">", "═>", "=>"]:
+                                if separator in ime_str:
+                                    return ime_str.split(separator)[-1].strip()
+                            for separator in [" / ", ": "]:
+                                if separator in ime_str:
+                                    return ime_str.split(separator)[-1].strip()
+                            return ime_str
+
+                        df_nasljednici["Nasljednik"] = df_nasljednici["Nasljednik"].apply(napredno_skrati_ime)
+                        df_nasljednici["Površina"] = df_nasljednici["Površina"].apply(lambda x: f"{int(x):,}".replace(",", " ") + " m²")
+                        df_nasljednici["Bodovi"] = df_nasljednici["Bodovi"].apply(lambda x: f"{float(x):,.2f}".replace(",", " ") + " bod")
+                        df_nasljednici["Udio (%)"] = df_nasljednici["Udio (%)"].apply(lambda x: f"{float(x):.2f} %")
+                        
+                        st.dataframe(df_nasljednici, hide_index=True, width='stretch')
+                    else:
+                        st.info("Još nema dodijeljenih čestica.")
+                except Exception:
+                    st.error("Greška pri generiranju tablice.")
+            else:
+                st.info("Čeka se prvi odvjetnički izračun.")
+                
+            st.divider()
+            
+            # Diskretne brojke na dnu
+            col_dolje1, col_dolje2 = st.columns(2)
+            with col_dolje1:
+                st.caption(f"📐 Ukupno: **{int(p_dod):,}".replace(",", " ") + " m²**")
+            with col_dolje2:
+                st.caption(f"📋 Preostalo: **{preostalo} čestica**")
+                
+            # 🔥 SKRAĆENI I INFORMATIVNI POPIS ZONA (Pregledno i kompaktno za mali zaslon)
+            st.write("")
+            st.markdown("**📋 Vrijednost zona (koeficijenti):**")
+            st.caption("M4 (1.00) • M4-OSS (0.95) • M4/VZP-1 (0.85) • M4/VZP-1/ZOP (0.80) • ZOP/T2 (0.90) • ZOP-1000 (0.40) • VZP-1 (0.30) • OZ-1 (0.25) • OZ-1/VZP-1 (0.20) • ŠO-1 (0.15) • ŠO-1/VZP-1 (0.10) • NEMA KARTU (0.30)")
+
+
+        # 🛠️ 2. REZERVIRANI KONTEJNER (Gumb i mini-bar na vrhu ekrana)
+        with prostor_za_live_karticu:
+            if st.button(f"📊 Live rezultati diobe ({postotak_top:.1f}% riješeno)", key="btn_obitelj_card_top_database_clean", width='stretch', type="secondary"):
+                prikazi_live_rezultate_mobilni_brzi(postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici)
+            
+            procent_za_mini_bar = min(max(float(postotak_top) / 100, 0.0), 1.0)
+            st.progress(procent_za_mini_bar)
+            st.write("") 
+          
         # =========================================================================
     # 📋 EKRAN 2: KATASTARSKI POSJEDOVNI LISTOVI
     # =========================================================================
@@ -677,6 +668,7 @@ with glavni_col2:
                             st.error(f"⚠️ Došlo je do greške pri iscrtavanju: {e}")
                             st.download_button("📥 Otvori / Preuzmi PDF", binarni_podaci, file_name=naziv_datoteke, mime="application/pdf", width='stretch', key=f"dl_doc_err_{odabrani_id}")
                     
+
                     # C. Prikaz Office dokumenata (Excel, Word)
                     elif naziv_datoteke.lower().endswith(('.xlsx', '.xls', '.docx', '.doc')):
                         st.download_button(label=f"📥 Preuzmi: {naziv_datoteke}", data=binarni_podaci, file_name=naziv_datoteke, key=f"dl_office_{odabrani_id}", width='stretch')
@@ -684,12 +676,8 @@ with glavni_col2:
             st.info("Nema dokumenata.")
 
     elif izbor == "👥 Odabir čestica":
-        import nasljednici
         nasljednici.prikazi_ekran_nasljednika(cursor, conn)
+        
 
     elif izbor == "⚖️ Upravljanje Diobom":
-        import dioba_admin
         dioba_admin.prikazi_ekran_administracije(cursor, conn)
-
-
-

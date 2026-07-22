@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from zoneinfo import ZoneInfo
 
-def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
+def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id, popis_brojeva_cestica=None):
     if "editor_interesa_v2" in st.session_state and st.session_state["editor_interesa_v2"]["edited_rows"]:
         promjene = st.session_state["editor_interesa_v2"]["edited_rows"]
         broj_promjena = 0
@@ -14,10 +14,11 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
                 # Kirurski precizno izvlacenje ID-a iz ciste Python liste, bez Pandasa!
                 cid = int(popis_slobodnih_id[indeks_int])
                 
-                # Broj cestice povlacimo sigurno iz baze podataka
-                cursor.execute("SELECT broj_cestice FROM cestice WHERE id = %s", (cid,))
-                rezultat_broja = cursor.fetchone()
-                broj = str(rezultat_broja[0]) if rezultat_broja else "Nepoznato"
+                # 🔥 POPRAVLJENO: Broj čestice izvlačimo trenutno iz memorije umjesto sporog SQL upita u petlji
+                if popis_brojeva_cestica and indeks_int < len(popis_brojeva_cestica):
+                    broj = str(popis_brojeva_cestica[indeks_int])
+                else:
+                    broj = "Nepoznato"
                 
                 nova_vrijednost = bool(izmjena["Odaberi"])
                 if nova_vrijednost:
@@ -25,7 +26,7 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
                     cursor.execute("""
                         INSERT INTO dioba_cestica (id_cestice, oznacena, status_diobe) 
                         VALUES (%s, TRUE, 'Interes')
-                        ON CONFLICT (id_cestice) DO UPDATE SET oznacena = TRUE,status_diobe = 'Interes'
+                        ON CONFLICT (id_cestice) DO UPDATE SET oznacena = TRUE, status_diobe = 'Interes'
                     """, (cid,))
                     cursor.execute("INSERT INTO log_diobe_cestica (id_cestice, broj_cestice, akcija, ip_adresa) VALUES (%s, %s, 'KLIKNUTO', %s)", (cid, broj, ip_adresa))
                     broj_promjena += 1
@@ -42,19 +43,20 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
         # 🚀 TRENUTNI REFRESH STATISTIKE: Okida se čim rodbina klikne kvačicu
         # =========================================================================
         try:
-            # 1. Računamo ukupni broj čestica i broj onih koje više NISU u statusu 'Interes'
+            # 1. Računamo ukupni broj čestica
             cursor.execute("SELECT COUNT(*) FROM public.dioba_cestica")
-            uk_komada = cursor.fetchone()[0]
-            uk_komada = int(uk_komada) if uk_komada and uk_komada > 0 else 1
+            rez_uk = cursor.fetchone()
+            uk_komada = int(rez_uk[0]) if rez_uk and rez_uk[0] and rez_uk[0] > 0 else 1
 
+            # 2. Računamo broj onih koje više NISU u statusu 'Interes'
             cursor.execute("SELECT COUNT(*) FROM public.dioba_cestica WHERE status_diobe != 'Interes'")
-            rijeseno_komada = cursor.fetchone()[0]
-            rijeseno_komada = int(rijeseno_komada) if rijeseno_komada else 0
+            rez_rijeseno = cursor.fetchone()
+            rijeseno_komada = int(rez_rijeseno[0]) if rez_rijeseno and rez_rijeseno[0] else 0
             
             postotak_rjesenja = (rijeseno_komada / uk_komada) * 100
             preostalo_cestica = uk_komada - rijeseno_komada
 
-            # 2. Povlačimo trenutno stanje ukupnih površina i bodova već dodijeljenih čestica iz baze
+            # 3. 🔥 POPRAVLJENO: Sigurno izvlačenje bez indeksnog rušenja ako je baza prazna
             cursor.execute("""
                 SELECT 
                     COALESCE(SUM(c.povrsina), 0) as dod_pov,
@@ -63,9 +65,11 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
                 JOIN public.dioba_cestica d ON c.id = d.id_cestice
                 WHERE d.status_diobe != 'Interes' AND d.nasljednik IS NOT NULL AND d.nasljednik != ''
             """)
-            ukupno_p_live, ukupno_b_live = cursor.fetchone()
+            rez_sume = cursor.fetchone()
+            ukupno_p_live = float(rez_sume[0]) if rez_sume and rez_sume[0] else 0.0
+            ukupno_b_live = float(rez_sume[1]) if rez_sume and rez_sume[1] else 0.0
 
-            # 3. Samo ažuriramo glavne brojke na cloudu, a tablicu nasljednika ostavljamo netaknutom
+            # 4. Ažuriramo glavne brojke na cloudu
             cursor.execute("""
                 INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo)
                 VALUES (1, %s, %s, %s, %s)
@@ -78,7 +82,10 @@ def obradi_klik_rodbe(cursor, conn, ip_adresa, popis_slobodnih_id):
             conn.commit()
             
         except Exception:
-            pass # Osiguravamo da privremeni proračun nikada ne sruši klik rodbine ako mreža trzne
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
 def prikazi_ekran_nasljednika(cursor, conn):
     st.title("👥 Iskazivanje interesa za čestice")
@@ -171,6 +178,9 @@ def prikazi_ekran_nasljednika(cursor, conn):
         df_slobodno = pd.DataFrame(podaci_slobodno) if podaci_slobodno else pd.DataFrame(columns=df_sve.columns)
         lista_slobodnih_id = [int(r["SKRIVENI_ID"]) for r in podaci_slobodno]
 
+        lista_slobodnih_brojeva = [str(r["Broj čestice"]) for r in podaci_slobodno] if podaci_slobodno else []
+
+
         uredjeni_df = st.data_editor(
             df_slobodno,
             hide_index=True,
@@ -182,7 +192,8 @@ def prikazi_ekran_nasljednika(cursor, conn):
             },
             key="editor_interesa_v2",
             on_change=obradi_klik_rodbe,
-            args=(cursor, conn, ip_adresa, lista_slobodnih_id)
+            args=(cursor, conn, ip_adresa, lista_slobodnih_id, lista_slobodnih_brojeva)
+            
         )
 
     with tab_dodijeljeno:
