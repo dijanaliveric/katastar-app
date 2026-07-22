@@ -468,7 +468,7 @@ with glavni_col2:
 
         # 🛠️ 2. REZERVIRANI KONTEJNER (Gumb i mini-bar na vrhu ekrana)
         with prostor_za_live_karticu:
-            if st.button(f"📊 Live rezultati diobe ({postotak_top:.1f}% riješeno)", key="btn_obitelj_card_top_database_clean", width='stretch', type="secondary"):
+            if st.button(f"📊 Rezultati diobe ({postotak_top:.1f}% riješeno)", key="btn_obitelj_card_top_database_clean", width='stretch', type="secondary"):
                 prikazi_live_rezultate_mobilni_brzi(postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici)
             
             procent_za_mini_bar = min(max(float(postotak_top) / 100, 0.0), 1.0)
