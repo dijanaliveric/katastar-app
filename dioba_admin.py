@@ -231,26 +231,53 @@ def prikazi_ekran_administracije(cursor, conn):
             )
 
 
+
             # =========================================================================
-            # 📐 UKUPNI ZBROJ POVRŠINE I BROJA ČESTICA (0% SQL upita, leti u memoriji)
+            # 📊  LIVE ANALITIKA U  TABOVIMA 
             # =========================================================================
             ukupna_m2_odvjetnik = df_odvjetnik["Površina (m²)"].sum() if not df_odvjetnik.empty else 0.0
             uk_broj_cestica = len(df_odvjetnik) if not df_odvjetnik.empty else 0
             
-            st.write("")
-            col_odv_prazan, col_odv_sredina, col_odv_desno = st.columns(3)
+            # Razvrstavanje po statusima direktno iz DataFrame-a
+            df_interes = df_odvjetnik[df_odvjetnik["Status"] == "Interes"] if not df_odvjetnik.empty else pd.DataFrame()
+            df_dodijeljeno = df_odvjetnik[df_odvjetnik["Status"] == "Dodijeljeno"] if not df_odvjetnik.empty else pd.DataFrame()
             
-            with col_odv_sredina:
-                st.metric(
-                    label="📋 Ukupan broj čestica:", 
-                    value=f"{uk_broj_cestica} kom"
-                )
+            m2_interes = df_interes["Površina (m²)"].sum() if not df_interes.empty else 0.0
+            broj_interes = len(df_interes)
+            
+            m2_dodijeljeno = df_dodijeljeno["Površina (m²)"].sum() if not df_dodijeljeno.empty else 0.0
+            broj_dodijeljeno = len(df_dodijeljeno)
+
+            st.write("")
+            
+            # Stvaramo 2 elegantna taba za razvrstavanje informacija
+            tab_analitika1, tab_analitika2 = st.tabs(["📊 Ukupno stanje", "⏳ Stanje po statusu"])
+            
+            with tab_analitika1:
+                # Decentan prikaz s manjim slovima preko HTML-a
+                st.markdown(f"""
+                <div style="padding: 5px 0px;">
+                    <span style="font-size: 0.95rem; color: #555555;">📋 Ukupan broj odabranih čestica:</span> 
+                    <strong style="font-size: 1.05rem;">{uk_broj_cestica} </strong>
+                    <br>
+                    <span style="font-size: 0.95rem; color: #555555;">📐 Ukupna površina odabranih čestica:</span> 
+                    <strong style="font-size: 1.05rem;">{int(ukupna_m2_odvjetnik):,}` m²</strong>
+                </div>
+                """.replace(",", " "), unsafe_allow_html=True)
                 
-            with col_odv_desno:
-                st.metric(
-                    label="📐 Ukupna površina:", 
-                    value=f"{int(ukupna_m2_odvjetnik):,}".replace(",", " ") + " m²"
-                )
+            with tab_analitika2:
+                st.markdown(f"""
+                <div style="padding: 5px 0px;">
+                    <span style="font-size: 0.95rem; color: #555555;">⏳ Preostalo u statusu <b>Interes</b>:</span> 
+                    <strong style="font-size: 1.05rem; color: #ff9800;">{broj_interes} </strong> 
+                    <span style="font-size: 0.9rem; color: #777777;">({int(m2_interes):,}` m²)</span>
+                    <br>
+                    <span style="font-size: 0.95rem; color: #555555;">🔒 Uspješno <b>Dodijeljeno</b> nasljednicima:</span> 
+                    <strong style="font-size: 1.05rem; color: #4caf50;">{broj_dodijeljeno} </strong> 
+                    <span style="font-size: 0.9rem; color: #777777;">({int(m2_dodijeljeno):,}` m²)</span>
+                </div>
+                """.replace(",", " "), unsafe_allow_html=True)
+                
             st.write("")
 
 
@@ -482,8 +509,8 @@ def prikazi_ekran_administracije(cursor, conn):
             # 📊 UNIVERZALNI SUSTAV PREKO ŠIFRARNIKA ZONA 
             # =========================================================================
             st.write("---")
-            st.markdown("### 📊 Kontrola pravednosti raspodjele (Uživo)")
-            st.write("Sustav računa stvarnu površinu i vrijednosne bodove na temelju koeficijenata zona povučenih uživo iz šifrarnika.")
+            st.markdown("### 📊 Kontrola pravednosti raspodjele")
+            st.write("Sustav računa stvarnu površinu i vrijednosne bodove na temelju koeficijenata zona.")
 
             # 1. Povlačimo sve zone i koeficijente uživo iz baze podataka (Nema try-except skrivača)
             cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM sifrarnik_zona")
