@@ -235,8 +235,27 @@ def prikazi_ekran_administracije(cursor, conn):
             
             
 
+
+
+                        # =========================================================================
+            # 📊 ČISTI DINAMIČKI POPIS ZONA IZ BAZE PODATAKA (Učitava se prije spremanja)
+            # =========================================================================
+            try:
+                cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM public.sifrarnik_zona WHERE oznaka_zone != '-' ORDER BY oznaka_zone")
+                sve_zone_baza = cursor.fetchall()
+                conn.commit() # Odmah oslobađamo transakciju čitanja da baza ostane brza
+                
+                # Sastavljamo živu listu bez ijedne fiksne riječi u kodu
+                stavke_sifrarnika = [f"**{zona}** ({float(koef):.2f})" for zona, koef in sve_zone_baza]
+                popis_zona_tekst = ", ".join(stavke_sifrarnika)
+            except Exception:
+                try: conn.rollback()
+                except Exception: pass
+                popis_zona_tekst = "Učitavanje..."
+
             # 3. KORAK: Nadopuna petlje za spremanje svih promjena odjednom (0% kvačica)
             izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
+            
             
             if izmjene:
                 promjene_odvjetnika = 0
@@ -349,7 +368,7 @@ def prikazi_ekran_administracije(cursor, conn):
 
                 if promjene_odvjetnika > 0:
                     # =========================================================================
-                    # 🚀 POPRAVLJENO: Čisti zbroj bodova (Bez ikakvih množenja i zona)
+                    #  dohvat bodova iz baze
                     # =========================================================================
                     try:
                         import json
@@ -450,11 +469,15 @@ def prikazi_ekran_administracije(cursor, conn):
             # 1. Povlačimo sve zone i koeficijente uživo iz baze podataka (Nema try-except skrivača)
             cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM sifrarnik_zona")
             koeficijenti_baza = {str(zona).strip().upper(): float(koef) for zona, koef in cursor.fetchall()}
+
+            
             df_dodijeljeno = uredjeni_df_odvjetnik[
                 (uredjeni_df_odvjetnik["Status"] == "Dodijeljeno") & 
                 (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].notna()) &
                 (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].str.strip() != "")
             ].copy()
+
+            
 
             if not df_dodijeljeno.empty:
                 def dohvati_koef_iz_baze(zona_tekst):
@@ -559,15 +582,9 @@ def prikazi_ekran_administracije(cursor, conn):
                     }
                 )
 
-                stavke_sifrarnika = []
-                for oznaka, koef in koeficijenti_baza.items():
-                    if oznaka != "-":  # Preskačemo sigurnosni default u popisu
-                        stavke_sifrarnika.append(f"**{oznaka}** ({koef:.2f})")
-                
-                popis_zona_tekst = ", ".join(stavke_sifrarnika)
+              
 
-
-                                # =========================================================================
+                # =========================================================================
                 # 📊 SINKRONIZACIJA: Slanje Vaših stopostotno točnih brojki na mobitele
                 # =========================================================================
                 try:

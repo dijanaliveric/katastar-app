@@ -6,6 +6,7 @@ import warnings
 import pandas as pd
 import nasljednici
 import dioba_admin
+import json
 
 
 # 1. POSTAVKE STRANICE
@@ -52,14 +53,50 @@ if "odabrani_zk" not in st.session_state: st.session_state["odabrani_zk"] = "Svi
 if "odabrana_vrsta_lista" not in st.session_state: st.session_state["odabrana_vrsta_lista"] = "Sve vrste lista"
 
 
-#--- SPAJANJE NA Superbase ---
-conn = psycopg2.connect(
-    host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
-    database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
-    password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
-    options="-c statement_timeout=5000"
-)
-cursor = conn.cursor()
+# #--- SPAJANJE NA Superbase ---
+# conn = psycopg2.connect(
+#     host=st.secrets["baza"]["host"], port=st.secrets["baza"]["port"],
+#     database=st.secrets["baza"]["database"], user=st.secrets["baza"]["user"],
+#     password=st.secrets["baza"]["password"], sslmode=st.secrets["baza"]["sslmode"],
+#     options="-c statement_timeout=5000"
+# )
+# cursor = conn.cursor()
+
+## =========================================================================
+# ⚡ PAMETNO CLOUD SPAJANJE - S AUTOMATSKIM RETRY MEHANIZMOM
+# =========================================================================
+conn = None
+cursor = None
+
+if st.session_state["autentificiran"]:
+    import time
+    
+    # Pokušavamo se spojiti maksimalno 3 puta prije nego što odustanemo
+    for pokusaj in range(3):
+        try:
+            conn = psycopg2.connect(
+                host=st.secrets["baza"]["host"], 
+                port=int(st.secrets["baza"]["port"]), 
+                database=st.secrets["baza"]["database"], 
+                user=st.secrets["baza"]["user"],
+                password=st.secrets["baza"]["password"], 
+                sslmode=st.secrets["baza"]["sslmode"],
+                # Dajemo bazi 6 sekundi za stabilizaciju mrežnog kanala
+                connect_timeout=6,
+                options="-c statement_timeout=5000"
+            )
+            conn.autocommit = True
+            cursor = conn.cursor()
+            break # Ako je spajanje uspjelo, prekidamo petlju i letimo dalje!
+            
+        except Exception as e:
+            if pokusaj < 2:
+                time.sleep(1) # Pričekamo 1 sekundu prije idućeg pokušaja da pooler prodiše
+            else:
+                # Ako propadnu sva 3 pokušaja, sigurno zaustavljamo aplikaciju bez rušenja
+                st.error(f"🔌 Supabase baza je trenutno nedostupna nakon 3 pokušaja. Pokušajte osvježiti stranicu. (Detalji: {e})")
+                st.stop()
+
 
 # # ----- LOKALNO -----
 # conn = psycopg2.connect(
@@ -394,22 +431,30 @@ with glavni_col2:
     
   
             
-               # =========================================================================
-        # 📱 LIVE STATISTIKA ZA MOBITELE OBITELJI - DECENTNA ZAOKRUŽENA VERZIJA
-        # =========================================================================
-        import pandas as pd
-        import json
 
+        # =========================================================================
+        # 📱 LIVE STATISTIKA ZA MOBITELE  -  IZRAČUN IZ BAZE PODATAKA
+        # =========================================================================
         try:
+            # 1. Povlačimo točne, fiksne brojke i tablicu nasljednika iz baze podataka
             cursor.execute("SELECT postotak, bodovi, povrsina, preostalo, tablica_nasljednika FROM public.live_statistika_diobe WHERE id = 1")
             statistika_baza = cursor.fetchone()
+            
             if statistika_baza:
                 postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = statistika_baza
                 postotak_top = float(postotak_top)
             else:
                 postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+            
+            # Ključno: Odmah zatvaramo transakciju čitanja da baza ostane potpuno brza i rasterećena
+            conn.commit()
         except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             postotak_top, dod_bod, dod_pov, broj_preostalih, json_nasljednici = 0.0, 0.0, 0.0, 0, None
+
 
         # 🛠️ 1. POPUP PROZOR (Zadržana širina 'small' radi mobitela)
         @st.dialog("📊 Rezultati diobe", width="small")
@@ -440,7 +485,7 @@ with glavni_col2:
 
                         df_nasljednici["Nasljednik"] = df_nasljednici["Nasljednik"].apply(napredno_skrati_ime)
                         df_nasljednici["Površina"] = df_nasljednici["Površina"].apply(lambda x: f"{int(x):,}".replace(",", " ") + " m²")
-                        df_nasljednici["Bodovi"] = df_nasljednici["Bodovi"].apply(lambda x: f"{float(x):,.2f}".replace(",", " ") + " bod")
+                        df_nasljednici["Bodovi"] = df_nasljednici["Bodovi"].apply(lambda x: f"{float(x):,.0f}".replace(",", " "))
                         df_nasljednici["Udio (%)"] = df_nasljednici["Udio (%)"].apply(lambda x: f"{float(x):.2f} %")
                         
                         st.dataframe(df_nasljednici, hide_index=True, width='stretch')
@@ -449,7 +494,7 @@ with glavni_col2:
                 except Exception:
                     st.error("Greška pri generiranju tablice.")
             else:
-                st.info("Čeka se prvi odvjetnički izračun.")
+                st.info("Čeka se prvi izračun.")
                 
             st.divider()
             
@@ -463,7 +508,22 @@ with glavni_col2:
             # 🔥 SKRAĆENI I INFORMATIVNI POPIS ZONA (Pregledno i kompaktno za mali zaslon)
             st.write("")
             st.markdown("**📋 Vrijednost zona (koeficijenti):**")
-            st.caption("M4 (1.00) • M4-OSS (0.95) • M4/VZP-1 (0.85) • M4/VZP-1/ZOP (0.80) • ZOP/T2 (0.90) • ZOP-1000 (0.40) • VZP-1 (0.30) • OZ-1 (0.25) • OZ-1/VZP-1 (0.20) • ŠO-1 (0.15) • ŠO-1/VZP-1 (0.10) • NEMA KARTU (0.30)")
+            # 📑 DINAMIČKI POPIS ZONA IZ BAZE PODATAKA UNUTAR POPUPA
+            try:
+                cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM public.sifrarnik_zona WHERE oznaka_zone != '-' ORDER BY oznaka_zone")
+                zone_baza = cursor.fetchall()
+                conn.commit() # Zatvaramo transakciju čitanja odmah
+                
+                stavke_mobilni = [f"{red[0]} ({float(red[1]):.2f})" for red in zone_baza]
+                popis_mobilni_tekst = " • ".join(stavke_mobilni)
+            except Exception:
+                try: conn.rollback()
+                except Exception: pass
+                popis_mobilni_tekst = "M4 (1.00) • M4-OSS (0.95) • M4/VZP-1 (0.85) • VZP-1 (0.30)" # Sigurnosni backup ako mreža trzne
+
+            st.write("")
+            st.markdown("**📋 Vrijednost zona (koeficijenti uživo):**")
+            st.caption(popis_mobilni_tekst)
 
 
         # 🛠️ 2. REZERVIRANI KONTEJNER (Gumb i mini-bar na vrhu ekrana)
