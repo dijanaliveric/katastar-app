@@ -98,16 +98,16 @@ if st.session_state["autentificiran"]:
                 st.stop()
 
 
-# # ----- LOKALNO -----
-# conn = psycopg2.connect(
-#     host=st.secrets["lokalna_baza"]["host"], 
-#     port=st.secrets["lokalna_baza"]["port"],
-#     database=st.secrets["lokalna_baza"]["database"], 
-#     user=st.secrets["lokalna_baza"]["user"],
-#     password=st.secrets["lokalna_baza"]["password"],
-#     options="-c statement_timeout=5000"
-# )
-# cursor = conn.cursor()
+# ----- LOKALNO -----
+conn = psycopg2.connect(
+    host=st.secrets["lokalna_baza"]["host"], 
+    port=st.secrets["lokalna_baza"]["port"],
+    database=st.secrets["lokalna_baza"]["database"], 
+    user=st.secrets["lokalna_baza"]["user"],
+    password=st.secrets["lokalna_baza"]["password"],
+    options="-c statement_timeout=5000"
+)
+cursor = conn.cursor()
 
 
 
@@ -505,10 +505,10 @@ with glavni_col2:
             with col_dolje2:
                 st.caption(f"📋 Preostalo: **{preostalo} čestica**")
                 
-            # 🔥 SKRAĆENI I INFORMATIVNI POPIS ZONA (Pregledno i kompaktno za mali zaslon)
-            st.write("")
-            st.markdown("**📋 Vrijednost zona (koeficijenti):**")
-            # 📑 DINAMIČKI POPIS ZONA IZ BAZE PODATAKA UNUTAR POPUPA
+            # # 🔥 SKRAĆENI I INFORMATIVNI POPIS ZONA (Pregledno i kompaktno za mali zaslon)
+            # st.write("")
+            # st.markdown("**📋 Vrijednost zona (koeficijenti):**")
+            # # 📑 DINAMIČKI POPIS ZONA IZ BAZE PODATAKA UNUTAR POPUPA
             try:
                 cursor.execute("SELECT oznaka_zone, koeficijent_vrijednosti FROM public.sifrarnik_zona WHERE oznaka_zone != '-' ORDER BY oznaka_zone")
                 zone_baza = cursor.fetchall()
@@ -522,9 +522,9 @@ with glavni_col2:
                 popis_mobilni_tekst = "M4 (1.00) • M4-OSS (0.95) • M4/VZP-1 (0.85) • VZP-1 (0.30)" # Sigurnosni backup ako mreža trzne
 
             st.write("")
-            st.markdown("**📋 Vrijednost zona (koeficijenti uživo):**")
+            st.markdown("**📋 Vrijednost zona (koeficijenti):**")
             st.caption(popis_mobilni_tekst)
-
+            
 
         # 🛠️ 2. REZERVIRANI KONTEJNER (Gumb i mini-bar na vrhu ekrana)
         with prostor_za_live_karticu:

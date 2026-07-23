@@ -230,10 +230,29 @@ def prikazi_ekran_administracije(cursor, conn):
                 key="editor_odvjetnika"
             )
 
-            # 2. KORAK: Automatsko spremanje običnih odabira + otvaranje kvačica za suvlasništvo (0% kvačica)
-            izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
+
+            # =========================================================================
+            # 📐 UKUPNI ZBROJ POVRŠINE I BROJA ČESTICA (0% SQL upita, leti u memoriji)
+            # =========================================================================
+            ukupna_m2_odvjetnik = df_odvjetnik["Površina (m²)"].sum() if not df_odvjetnik.empty else 0.0
+            uk_broj_cestica = len(df_odvjetnik) if not df_odvjetnik.empty else 0
             
+            st.write("")
+            col_odv_prazan, col_odv_sredina, col_odv_desno = st.columns(3)
             
+            with col_odv_sredina:
+                st.metric(
+                    label="📋 Ukupan broj čestica:", 
+                    value=f"{uk_broj_cestica} kom"
+                )
+                
+            with col_odv_desno:
+                st.metric(
+                    label="📐 Ukupna površina:", 
+                    value=f"{int(ukupna_m2_odvjetnik):,}".replace(",", " ") + " m²"
+                )
+            st.write("")
+
 
 
 
