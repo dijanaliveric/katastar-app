@@ -98,16 +98,16 @@ if st.session_state["autentificiran"]:
                 st.stop()
 
 
-# ----- LOKALNO -----
-conn = psycopg2.connect(
-    host=st.secrets["lokalna_baza"]["host"], 
-    port=st.secrets["lokalna_baza"]["port"],
-    database=st.secrets["lokalna_baza"]["database"], 
-    user=st.secrets["lokalna_baza"]["user"],
-    password=st.secrets["lokalna_baza"]["password"],
-    options="-c statement_timeout=5000"
-)
-cursor = conn.cursor()
+# # ----- LOKALNO -----
+# conn = psycopg2.connect(
+#     host=st.secrets["lokalna_baza"]["host"], 
+#     port=st.secrets["lokalna_baza"]["port"],
+#     database=st.secrets["lokalna_baza"]["database"], 
+#     user=st.secrets["lokalna_baza"]["user"],
+#     password=st.secrets["lokalna_baza"]["password"],
+#     options="-c statement_timeout=5000"
+# )
+# cursor = conn.cursor()
 
 
 
