@@ -172,20 +172,26 @@ def prikazi_ekran_administracije(cursor, conn):
 
 
         # 1. UPIT ZA ODVJETNIKA - DODANA C.ZONA NA KRAJ SELECTA
+        p_bodovi = 0
+
+
         cursor.execute("""
-            SELECT dc.id_cestice, c.broj_cestice, c.zk_ulozak, p.naziv_podrucja, c.povrsina, dc.nasljednik, dc.status_diobe, c.zona, dc.korekcija_postotak
+            SELECT dc.id_cestice, c.broj_cestice, c.zk_ulozak, p.naziv_podrucja, c.povrsina, dc.nasljednik, dc.status_diobe, c.zona, dc.korekcija_postotak,  (c.povrsina * COALESCE(sz.koeficijent_vrijednosti, 1.0)) as pocetni_bodovi
             FROM dioba_cestica dc
             JOIN cestice c ON dc.id_cestice = c.id
             JOIN podrucja p ON c.id_podrucja = p.id
+            LEFT JOIN sifrarnik_zona sz ON c.zona = sz.oznaka_zone           
             WHERE dc.oznacena = TRUE
             ORDER BY c.broj_cestice
         """)
         poklikane_cestice = cursor.fetchall()
+
+
     
 
         if poklikane_cestice:
             podaci_za_odvjetnika = []        
-            for cid, broj, zk, podrucje, povrsina, nasljednik, status, zon, kor_postotak in poklikane_cestice:
+            for cid, broj, zk, podrucje, povrsina, nasljednik, status, zon, kor_postotak, p_bodovi in poklikane_cestice: 
     
                 podaci_za_odvjetnika.append({
                     "ID Čestice": cid,
@@ -194,6 +200,7 @@ def prikazi_ekran_administracije(cursor, conn):
                     "ZK Uložak": str(zk) if zk else "-",
                     "Područje": podrucje,
                     "Površina (m²)": float(povrsina) if povrsina else 0.0,
+                    "Početni bodovi": int(p_bodovi) if p_bodovi else 0,
                     "Kome pripada (Nasljednik)": nasljednik if nasljednik else "",
                     "Status": status if status else "Interes",
                     "Korekcija vrijednosti (%)": float(kor_postotak) if kor_postotak is not None else 0.0,
@@ -214,7 +221,7 @@ def prikazi_ekran_administracije(cursor, conn):
             uredjeni_df_odvjetnik = st.data_editor(
                 df_odvjetnik,
                 hide_index=True,
-                disabled=["ID Čestice", "Broj čestice", "Zona", "ZK Uložak", "Područje", "Površina (m²)"],
+                disabled=["ID Čestice", "Broj čestice", "Zona", "ZK Uložak", "Područje", "Površina (m²)", "Početni bodovi"],
                 width="stretch",
                 column_config={
                     "Kome pripada (Nasljednik)": st.column_config.SelectboxColumn("Kome pripada (Nasljednik)", options=popis_s_opcijom, default=""),
@@ -229,6 +236,8 @@ def prikazi_ekran_administracije(cursor, conn):
                 },
                 key="editor_odvjetnika"
             )
+
+
 
 
 
