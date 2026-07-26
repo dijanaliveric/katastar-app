@@ -736,12 +736,18 @@ def prikazi_ekran_administracije(cursor, conn):
                 st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine...*")
             
             else:
-                # 🛠️ KLJUČNI POPRAVAK: Kada nema više niti jedne dodjele, aplikacija upada ovdje.
-                # Šaljemo eksplicitni DELETE i COMMIT kako bi id=1 trajno nestao iz baze!
                 try:
-                    cursor.execute("DELETE FROM public.live_statistika_diobe WHERE id = 1;")
+                    # 🧼 1. Čistimo bazu podataka
+                    cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
                     conn.commit()
+                    
+                    # 🔄 2. KLJUČNI POPRAVAK: Prisila za Streamlit
+                    # Čim se baza obriše, ponovno pokrećemo skriptu od vrha.
+                    # To će prisiliti Streamlit da potpuno očisti cache na ekranu i live tablica će ostati PRAZNA.
+                    st.rerun()
+
                 except Exception:
-                    pass
+                    try: conn.rollback()
+                    except Exception: pass
 
                 st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
