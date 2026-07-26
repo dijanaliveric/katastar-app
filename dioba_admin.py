@@ -312,6 +312,7 @@ def prikazi_ekran_administracije(cursor, conn):
             izmjene = st.session_state.get("editor_odvjetnika", {}).get("edited_rows", {})
             
             
+            
             if izmjene:
                 promjene_odvjetnika = 0
                 for indeks_retka, promijenjena_polja in izmjene.items():
@@ -379,6 +380,13 @@ def prikazi_ekran_administracije(cursor, conn):
 
 
             if st.button("⚖️ Spremi konačnu raspodjelu", key="btn_save_odvjetnik", width="stretch"):
+#####
+                odabrani_nasljednici = uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].dropna().astype(str).str.strip().values
+        
+                if "👥 SUVLASNIŠTVO (Više osoba)" in odabrani_nasljednici:
+                    st.error("⚠️ Nemoguće spremiti! Na nekim česticama je odabrano 'SUVLASNIŠTVO', ali niste definirali konkretne osobe u skočnom prozoru.")
+                    st.stop()  # Zaustavlja daljnje izvršavanje koda (blokira petlju ispod)
+#####
                 promjene_odvjetnika = 0
                 for indeks_red, redak in uredjeni_df_odvjetnik.iterrows():
                     cid = int(redak["ID Čestice"])
@@ -422,11 +430,16 @@ def prikazi_ekran_administracije(cursor, conn):
                         promjene_odvjetnika += 1
 
                 if promjene_odvjetnika > 0:
+
                     # =========================================================================
                     #  dohvat bodova iz baze
                     # =========================================================================
                     try:
                         import json
+                       # cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
+                        cursor.execute("DELETE FROM public.live_statistika_diobe;")
+                        conn.commit()
+
 
                         df_live = uredjeni_df_odvjetnik.copy()
                         
@@ -533,6 +546,8 @@ def prikazi_ekran_administracije(cursor, conn):
             ].copy()
 
             
+            cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
+            conn.commit()
 
             if not df_dodijeljeno.empty:
                 def dohvati_koef_iz_baze(zona_tekst):
@@ -584,6 +599,9 @@ def prikazi_ekran_administracije(cursor, conn):
                                 "Površina (m²)": povrsina_po_osobi,
                                 "Vrijednosni bodovi": bodovi_po_osobi
                             })
+
+               # cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
+
                 if razbijeni_podaci:
                     df_razbijeno = pd.DataFrame(razbijeni_podaci)
                     statistika = df_razbijeno.groupby("Kome pripada (Nasljednik)").agg({
