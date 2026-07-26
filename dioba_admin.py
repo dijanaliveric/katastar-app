@@ -693,6 +693,27 @@ def prikazi_ekran_administracije(cursor, conn):
                         );
                     """)
 
+            #         # Upisujemo Vaše gotove, preračunate brojke u bazu
+            #         cursor.execute("""
+            #             INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo, tablica_nasljednika)
+            #             VALUES (1, %s, %s, %s, %s, %s)
+            #             ON CONFLICT (id) DO UPDATE SET 
+            #                 postotak = EXCLUDED.postotak,
+            #                 bodovi = EXCLUDED.bodovi,
+            #                 povrsina = EXCLUDED.povrsina,
+            #                 preostalo = EXCLUDED.preostalo,
+            #                 tablica_nasljednika = EXCLUDED.tablica_nasljednika;
+            #         """, (float(postotak_rjesenja), float(ukupno_bodova), float(ukupno_m2), int(preostalo_cestica), json_nasljednici))
+            #         conn.commit()
+
+            #     except Exception as e:
+            #         st.sidebar.error(f"Pomoćni mobilni sinkronizator: {e}")
+
+                
+            #     st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine s koeficijentom zone iz šifrarnika koji se trenutno primjenjuje za ovaj obračun: {popis_zona_tekst}. Kod čestica koje se protežu kroz više zona (kombinirane zone), sustav automatski prepoznaje sve navedene zone, ali obračun bodova temelji na koeficijentu najvrjednije priznate zone u toj kombinaciji. Time se vrijednost preostalih, manje vrijednih dijelova čestice u konačnom izračunu smanjuje u korist dominantne ekonomske cjeline.*")
+            # else:
+            #     st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
+
                     # Upisujemo Vaše gotove, preračunate brojke u bazu
                     cursor.execute("""
                         INSERT INTO public.live_statistika_diobe (id, postotak, bodovi, povrsina, preostalo, tablica_nasljednika)
@@ -708,9 +729,16 @@ def prikazi_ekran_administracije(cursor, conn):
 
                 except Exception as e:
                     st.sidebar.error(f"Pomoćni mobilni sinkronizator: {e}")
-
                 
-                st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine s koeficijentom zone iz šifrarnika koji se trenutno primjenjuje za ovaj obračun: {popis_zona_tekst}. Kod čestica koje se protežu kroz više zona (kombinirane zone), sustav automatski prepoznaje sve navedene zone, ali obračun bodova temelji na koeficijentu najvrjednije priznate zone u toj kombinaciji. Time se vrijednost preostalih, manje vrijednih dijelova čestice u konačnom izračunu smanjuje u korist dominantne ekonomske cjeline.*")
+                st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine...*")
+            
             else:
-                st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
+                # 🛠️ KLJUČNI POPRAVAK: Kada nema više niti jedne dodjele, aplikacija upada ovdje.
+                # Šaljemo eksplicitni DELETE i COMMIT kako bi id=1 trajno nestao iz baze!
+                try:
+                    cursor.execute("DELETE FROM public.live_statistika_diobe WHERE id = 1;")
+                    conn.commit()
+                except Exception:
+                    pass
 
+                st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
