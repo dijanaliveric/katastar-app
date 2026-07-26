@@ -754,16 +754,22 @@ def prikazi_ekran_administracije(cursor, conn):
             # # 🚀 PROLAZ B: Ako su SVE raspodjele obrisane (df_dodijeljeno je prazan)
             else:
                 try:
-                    # 🔍 Provjeravamo je li korisnik upravo kliknuo i ispraznio tablicu
+                    # 🔍 Provjeravamo ima li uopće zaostalih klikova u memoriji editora
                     editor_state = st.session_state.get("editor_odvjetnika", {})
-                    bilo_je_izmjena = len(editor_state.get("edited_rows", {})) > 0
+                    ima_klikova_u_memoriji = len(editor_state.get("edited_rows", {})) > 0
 
-                    if bilo_je_izmjena:
-                        # 🧼 1. Čistimo bazu podataka SAMO ako je korisnik upravo napravio klik
+                    if ima_klikova_u_memoriji:
+                        # 🧼 1. Čistimo bazu podataka
                         cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
                         conn.commit()
+
+                        # 🛑 2. KLJUČNI POPRAVAK ZA BESKONAČNU PETLJU:
+                        # Brišemo i resetiramo stanje editora u Streamlit memoriji.
+                        # Bez ovog koraka, aplikacija bi se konstantno i unedogled osvježavala!
+                        if "editor_odvjetnika" in st.session_state:
+                            st.session_state["editor_odvjetnika"] = {"edited_rows": {}, "added_rows": [], "deleted_rows": []}
                         
-                        # 🔄 2. Osvježavamo stranicu SAMO JEDNOM da maknemo stari prikaz s ekrana
+                        # 🔄 3. Sada je sigurno: radimo samo JEDAN refresh da očistimo ekran
                         st.rerun()
 
                 except Exception:
