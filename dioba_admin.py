@@ -735,16 +735,36 @@ def prikazi_ekran_administracije(cursor, conn):
                 
                 st.caption(f"💡 *Napomena: Vrijednosni bodovi računaju se množenjem površine...*")
             
+            # else:
+            #     try:
+            #         # 🧼 1. Čistimo bazu podataka
+            #         cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
+            #         conn.commit()
+                    
+            #         # 🔄 2. KLJUČNI POPRAVAK: Prisila za Streamlit
+            #         # Čim se baza obriše, ponovno pokrećemo skriptu od vrha.
+            #         # To će prisiliti Streamlit da potpuno očisti cache na ekranu i live tablica će ostati PRAZNA.
+            #         st.rerun()
+
+            #     except Exception:
+            #         try: conn.rollback()
+            #         except Exception: pass
+
+            #     st.caption("U gornjoj tablici promijenite status barem jedne čestice u 'Dodijeljeno' i odaberite nasljednika kako bi se pokrenuo automatski izračun pravednosti.")
+            # # 🚀 PROLAZ B: Ako su SVE raspodjele obrisane (df_dodijeljeno je prazan)
             else:
                 try:
-                    # 🧼 1. Čistimo bazu podataka
-                    cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
-                    conn.commit()
-                    
-                    # 🔄 2. KLJUČNI POPRAVAK: Prisila za Streamlit
-                    # Čim se baza obriše, ponovno pokrećemo skriptu od vrha.
-                    # To će prisiliti Streamlit da potpuno očisti cache na ekranu i live tablica će ostati PRAZNA.
-                    st.rerun()
+                    # 🔍 Provjeravamo je li korisnik upravo kliknuo i ispraznio tablicu
+                    editor_state = st.session_state.get("editor_odvjetnika", {})
+                    bilo_je_izmjena = len(editor_state.get("edited_rows", {})) > 0
+
+                    if bilo_je_izmjena:
+                        # 🧼 1. Čistimo bazu podataka SAMO ako je korisnik upravo napravio klik
+                        cursor.execute("TRUNCATE TABLE public.live_statistika_diobe RESTART IDENTITY CASCADE;")
+                        conn.commit()
+                        
+                        # 🔄 2. Osvježavamo stranicu SAMO JEDNOM da maknemo stari prikaz s ekrana
+                        st.rerun()
 
                 except Exception:
                     try: conn.rollback()
