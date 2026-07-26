@@ -381,13 +381,16 @@ def prikazi_ekran_administracije(cursor, conn):
 
             if st.button("⚖️ Spremi konačnu raspodjelu", key="btn_save_odvjetnik", width="stretch"):
 #####
-                odabrani_nasljednici = uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].dropna().astype(str).str.strip().values
-        
-                if "👥 SUVLASNIŠTVO (Više osoba)" in odabrani_nasljednici:
+                 
+                if "Kome pripada (Nasljednik)" in uredjeni_df_odvjetnik.columns and (uredjeni_df_odvjetnik["Kome pripada (Nasljednik)"].astype(str).str.strip() == "👥 SUVLASNIŠTVO (Više osoba)").any():
+            
+            # Ako pronađe privremeni tekst, ispisuje poruku i NE POKREĆE petlju za spremanje ispod
                     st.error("⚠️ Nemoguće spremiti! Na nekim česticama je odabrano 'SUVLASNIŠTVO', ali niste definirali konkretne osobe u skočnom prozoru.")
-                    st.stop()  # Zaustavlja daljnje izvršavanje koda (blokira petlju ispod)
+            
+                else:
+  
 #####
-                promjene_odvjetnika = 0
+                    promjene_odvjetnika = 0
                 for indeks_red, redak in uredjeni_df_odvjetnik.iterrows():
                     cid = int(redak["ID Čestice"])
                     broj = str(redak["Broj čestice"])
